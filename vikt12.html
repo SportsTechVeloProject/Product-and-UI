@@ -1,0 +1,2248 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Vikt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F2EFE7;
+    --surface: #FBFAF6;
+    --fg: #1B1D22;
+    --muted: #6B7480;
+    --border: #D8D3C6;
+    --accent: #2247D6;
+    --accent-contrast: #F7F8FF;
+    --accent-glow: rgba(34, 71, 214, 0.32);
+    --accent-glow-strong: rgba(34, 71, 214, 0.5);
+    --zone2: #B8860B;
+    --rule: #C9C3B2;
+    --shadow: 0 1px 0 rgba(27,29,34,0.05);
+    --chart-left: #2247D6;
+    --chart-right: #B8860B;
+    --chart-grid: #DFDACC;
+    --good: #2E7D32;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171B;
+      --surface: #1C1F24;
+      --fg: #ECE9E1;
+      --muted: #9BA3AE;
+      --border: #33363D;
+      --accent: #6C8CFF;
+      --accent-contrast: #0C1024;
+      --accent-glow: rgba(108, 140, 255, 0.38);
+      --accent-glow-strong: rgba(108, 140, 255, 0.6);
+      --zone2: #E8C158;
+      --rule: #2C2F35;
+      --chart-left: #5C77E0;
+      --chart-right: #A67C23;
+      --chart-grid: #33363D;
+      --good: #4CAF50;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15171B;
+    --surface: #1C1F24;
+    --fg: #ECE9E1;
+    --muted: #9BA3AE;
+    --border: #33363D;
+    --accent: #6C8CFF;
+    --accent-contrast: #0C1024;
+    --accent-glow: rgba(108, 140, 255, 0.38);
+    --accent-glow-strong: rgba(108, 140, 255, 0.6);
+    --zone2: #E8C158;
+    --rule: #2C2F35;
+    --chart-left: #5C77E0;
+    --chart-right: #A67C23;
+    --chart-grid: #33363D;
+    --good: #4CAF50;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding-inline: 24px;
+  }
+  h1, h2, h3 {
+    font-family: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+    margin: 0;
+  }
+  .mono {
+    font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: inherit; }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ---- nav ---- */
+  nav.top {
+    border-bottom: 1px solid var(--rule);
+    background: var(--bg);
+  }
+  nav.top .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-block: 18px;
+    flex-wrap: wrap;
+  }
+  .logo {
+    font-family: 'Big Shoulders Display', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .logo .dot { color: var(--accent); }
+  .navlinks {
+    display: flex;
+    gap: 28px;
+    font-size: 0.92rem;
+    flex-wrap: wrap;
+  }
+  .navlinks a { text-decoration: none; color: var(--muted); }
+  .navlinks a:hover { color: var(--fg); }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent);
+    color: var(--accent-contrast);
+    border: none;
+    padding: 11px 20px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.92rem;
+    cursor: pointer;
+    text-decoration: none;
+    border-radius: 3px;
+  }
+  .btn:focus-visible, a:focus-visible, .btn-ghost:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border);
+    padding: 10px 19px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 500;
+    font-size: 0.92rem;
+    text-decoration: none;
+    border-radius: 3px;
+  }
+
+  /* ---- hero ---- */
+  .hero {
+    padding-block: 64px 56px;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .hero h1 {
+    font-size: clamp(2.4rem, 5.4vw, 3.9rem);
+    line-height: 0.98;
+    margin-top: 10px;
+  }
+  .hero h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .hero p.lede {
+    max-width: 46ch;
+    font-size: 1.08rem;
+    color: var(--muted);
+    margin-top: 18px;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 14px;
+    margin-top: 28px;
+    flex-wrap: wrap;
+  }
+  .hero-note {
+    margin-top: 16px;
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  .trace-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 22px 22px 18px;
+  }
+  .trace-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .trace-head .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.74rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .trace-readout {
+    display: flex;
+    gap: 22px;
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .trace-readout div { min-width: 108px; }
+  .trace-readout .v {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.3rem;
+    font-weight: 500;
+  }
+  .trace-readout .k {
+    font-size: 0.74rem;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+
+  /* ---- section shells ---- */
+  section { padding-block: 58px; border-top: 1px solid var(--rule); }
+  section > .wrap > .head { max-width: 60ch; margin-bottom: 36px; }
+  section h2 { font-size: clamp(1.7rem, 3vw, 2.3rem); margin-top: 8px; }
+  section .head p { color: var(--muted); margin-top: 12px; font-size: 1rem; }
+
+  .prose { max-width: 62ch; font-size: 1.02rem; }
+  .prose p + p { margin-top: 16px; }
+  .prose strong { color: var(--fg); }
+
+  /* ---- steps ---- */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 28px;
+  }
+  .step {
+    border-top: 3px solid var(--accent);
+    padding-top: 16px;
+  }
+  .step .n {
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    font-size: 0.85rem;
+    letter-spacing: 0.06em;
+  }
+  .step h3 { font-size: 1.25rem; margin-top: 8px; text-transform: none; }
+  .step p { color: var(--muted); margin-top: 8px; font-size: 0.95rem; }
+
+  /* ---- zones table ---- */
+  .zones-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
+  table.zones { width: 100%; border-collapse: collapse; min-width: 560px; background: var(--surface); }
+  table.zones th, table.zones td { text-align: left; padding: 14px 18px; border-bottom: 1px solid var(--border); font-size: 0.92rem; }
+  table.zones th { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  table.zones tr:last-child td { border-bottom: none; }
+  table.zones td.range { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 10px; vertical-align: middle; }
+  .zones-note { font-size: 0.82rem; color: var(--muted); margin-top: 14px; max-width: 62ch; }
+
+  /* ---- who band ---- */
+  .who {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  .stat { border-left: 2px solid var(--accent); padding-left: 18px; }
+  .stat .num { font-family: 'IBM Plex Mono', monospace; font-size: 2.1rem; font-weight: 500; }
+  .stat .desc { color: var(--muted); font-size: 0.92rem; margin-top: 4px; }
+  .stat + .stat { margin-top: 26px; }
+
+  /* ---- pricing ---- */
+  .pricing {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .plan {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .plan.featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .plan .tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .plan .tag.hl { color: var(--accent); }
+  .plan .name { font-size: 1.15rem; font-weight: 600; }
+  .plan .price { font-family: 'IBM Plex Mono', monospace; font-size: 2rem; }
+  .plan .price span { font-size: 0.95rem; color: var(--muted); font-family: 'IBM Plex Sans', sans-serif; }
+  .plan ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 0.92rem; color: var(--muted); }
+  .plan ul li::before { content: "—"; color: var(--accent); margin-right: 8px; }
+  .plan .btn-ghost, .plan .btn { margin-top: auto; justify-content: center; }
+
+  /* ---- cta ---- */
+  .cta-band {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .cta-band h2 { font-size: clamp(1.5rem, 3vw, 2rem); max-width: 22ch; }
+
+  /* ---- footer ---- */
+  footer { border-top: 1px solid var(--rule); padding-block: 32px 40px; }
+  footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .plates { display: flex; gap: 6px; }
+  .plates span { width: 14px; height: 14px; border-radius: 2px; display: inline-block; }
+  footer .fine { font-size: 0.8rem; color: var(--muted); }
+
+  @media (max-width: 760px) {
+    .hero { grid-template-columns: 1fr; padding-block: 40px 36px; }
+    .steps { grid-template-columns: 1fr; gap: 30px; }
+    .who { grid-template-columns: 1fr; }
+    .pricing { grid-template-columns: 1fr; }
+    .cta-band { flex-direction: column; align-items: flex-start; }
+    section { padding-block: 42px; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .trace-svg .sweep { animation: sweep 2.2s ease-out 1; }
+  }
+  @keyframes sweep {
+    from { stroke-dashoffset: 420; }
+    to { stroke-dashoffset: 0; }
+  }
+
+  /* ================= app / demo view ================= */
+  .app-top {
+    border-bottom: 1px solid var(--rule);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  .app-top-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding-block: 16px;
+    flex-wrap: wrap;
+  }
+  .applinks {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-left: 4px;
+  }
+  .apptab {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-weight: 600;
+    font-size: 0.92rem;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--muted);
+    padding: 8px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .apptab:hover { color: var(--fg); }
+  .apptab[aria-selected="true"] {
+    color: var(--fg);
+    background: var(--surface);
+    border-color: var(--border);
+  }
+  .demo-badge {
+    margin-left: auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: 20px;
+  }
+
+  .theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    flex: none;
+  }
+  .theme-toggle:hover { color: var(--fg); border-color: var(--muted); }
+  .theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .app-body { padding-block: 36px 64px; display: flex; flex-direction: column; gap: 40px; }
+
+  .app-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .app-hero h2 { font-size: clamp(1.6rem, 3vw, 2.1rem); margin-top: 6px; text-transform: none; }
+  .exit-link { margin-top: 12px; }
+  .exit-link a { font-size: 0.86rem; color: var(--muted); text-decoration: none; }
+  .exit-link a:hover { color: var(--accent); }
+
+  .log-form {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 20px;
+    min-width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .log-form label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .log-row { display: flex; gap: 10px; }
+  .log-row input {
+    flex: 1;
+    min-width: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--fg);
+  }
+  .log-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .log-note { font-size: 0.78rem; color: var(--muted); margin: 0; }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    align-items: start;
+  }
+  .chart-card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px 20px 16px;
+  }
+  .chart-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .chart-head h3 { font-size: 1.05rem; text-transform: none; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; }
+  .chart-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .chart-caption { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+  #velChart, #pathChart, #driftChart { width: 100%; height: auto; overflow: visible; }
+
+  .chart-visual {
+    display: block;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: box-shadow 0.18s ease;
+  }
+  .chart-visual:hover, .chart-visual:focus-visible {
+    box-shadow: 0 0 0 3px var(--accent-glow), 0 0 28px 4px var(--accent-glow);
+    outline: none;
+  }
+
+  .chart-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 9, 8, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  .chart-modal-overlay[hidden] { display: none; }
+  .chart-modal {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-width: 880px;
+    width: 100%;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 28px 28px 26px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  .chart-modal .chart-head { padding-right: 36px; }
+  .chart-modal svg { width: 100%; height: auto; overflow: visible; }
+  .chart-modal .chart-caption { margin-top: 14px; font-size: 0.88rem; }
+  .chart-card.modal-chart { border: none; padding: 0; background: transparent; }
+
+  .chart-nav-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--fg);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 51;
+    padding: 0;
+  }
+  .chart-nav-arrow:hover { box-shadow: 0 0 0 3px var(--accent-glow); border-color: var(--accent); }
+  .chart-nav-prev { left: 12px; }
+  .chart-nav-next { right: 12px; }
+  @media (max-width: 640px) {
+    .chart-nav-arrow { display: none; }
+  }
+
+  .chart-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .chart-legend[hidden] { display: none; }
+  .chart-legend.two { margin-top: 10px; }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+  .rep-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rep-pills[hidden] { display: none; }
+  .rep-pill {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.76rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    padding: 5px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+  .rep-pill[aria-pressed="true"] { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
+
+  .rep-pill-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .rep-pill-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    flex: none;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .rep-pill-arrow:hover:not(:disabled) { color: var(--fg); border-color: var(--muted); }
+  .rep-pill-arrow:disabled { opacity: 0.35; cursor: default; }
+
+  .chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--fg);
+    color: var(--bg);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.74rem;
+    padding: 6px 9px;
+    border-radius: 3px;
+    line-height: 1.4;
+    white-space: nowrap;
+    transform: translate(-50%, -120%);
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 4;
+  }
+  .chart-wrap-inner { position: relative; }
+
+  .zone-readout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 22px 24px;
+  }
+  .head-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .zone-readout h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; }
+  .muted-small { font-size: 0.82rem; color: var(--muted); }
+  .rep-zones { display: flex; flex-wrap: wrap; gap: 10px; }
+  .rep-chip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 3px;
+    padding: 8px 12px;
+    min-width: 108px;
+  }
+  .rep-chip .rn { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; font-family: 'IBM Plex Mono', monospace; }
+  .rep-chip .rv { font-family: 'IBM Plex Mono', monospace; font-size: 1.05rem; }
+  .rep-chip .rz { font-size: 0.76rem; }
+
+  .zone-link {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+    text-align: left;
+  }
+  .zone-link:hover { color: var(--accent); }
+  .zone-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .zone-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 9, 8, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .zone-modal-overlay[hidden] { display: none; }
+  .zone-modal {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    max-width: 460px;
+    width: 100%;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 26px 26px 28px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+  .zone-modal-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-right: 32px;
+    margin-bottom: 20px;
+  }
+  .zone-tab {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    padding: 6px 11px;
+    border-radius: 20px;
+    cursor: pointer;
+  }
+  .zone-tab:hover { color: var(--fg); }
+  .zone-tab[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); border-color: var(--accent); }
+  .zone-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 2;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .zone-modal-close:hover { color: var(--fg); border-color: var(--muted); }
+  .zone-modal-body h3 { font-size: 1.35rem; text-transform: none; margin-top: 6px; }
+  .zone-modal-body p { font-size: 0.94rem; color: var(--fg); margin-top: 12px; line-height: 1.6; }
+  .zone-modal-body .zone-modal-benefit { color: var(--muted); }
+  .zone-modal-body .zone-modal-benefit strong { color: var(--fg); }
+
+  .history h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; margin-bottom: 14px; }
+  .history-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
+  table.history-table { width: 100%; border-collapse: collapse; min-width: 520px; background: var(--surface); }
+  table.history-table th, table.history-table td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  table.history-table th { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  table.history-table tbody tr { cursor: pointer; }
+  table.history-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  table.history-table tbody tr[aria-current="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  table.history-table tr:last-child td { border-bottom: none; }
+  table.history-table td.num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 760px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    .app-hero { flex-direction: column; }
+    .log-form { width: 100%; }
+  }
+</style>
+
+<div id="marketingView">
+<nav class="top">
+  <div class="wrap">
+    <a class="logo" href="#top">VIKT<span class="dot">.</span></a>
+    <div class="navlinks">
+      <a href="#how">How it works</a>
+      <a href="#zones">Velocity zones</a>
+      <a href="#pricing">Pricing</a>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <button class="btn-ghost open-auth-btn" type="button">Log in</button>
+      <a class="btn" href="#cta">Request early access</a>
+      <button class="theme-toggle" type="button" aria-label="Toggle color theme">
+        <svg class="icon-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="10" y1="1" y2="3.4" x2="10"></line><line x1="10" y1="16.6" y2="19" x2="10"></line><line x1="1" y1="10" x2="3.4" y2="10"></line><line x1="16.6" y1="10" x2="19" y2="10"></line><line x1="3.9" y1="3.9" x2="5.6" y2="5.6"></line><line x1="14.4" y1="14.4" x2="16.1" y2="16.1"></line><line x1="3.9" y1="16.1" x2="5.6" y2="14.4"></line><line x1="14.4" y1="5.6" x2="16.1" y2="3.9"></line></g></svg>
+        <svg class="icon-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="display:none"><path fill="currentColor" d="M16.5 12.5A7 7 0 0 1 7.5 3.5a7 7 0 1 0 9 9z"></path></svg>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <p class="eyebrow">Velocity-based training · for the platform, not the lab</p>
+      <h1>Every rep,<br><em>measured.</em></h1>
+      <p class="lede">A Movesense IMU clips to your bar sleeve. Vikt turns the raw motion data into bar speed, tempo, and velocity loss — set by set — so you load off what your body did today, not what a spreadsheet guessed on Sunday.</p>
+      <div class="hero-actions">
+        <button class="btn open-auth-btn" type="button">Log in</button>
+        <a class="btn-ghost" href="#how">See how it works ↓</a>
+      </div>
+      <p class="hero-note">No proprietary hardware to buy. Works with the Movesense Flash sensor you already own.</p>
+    </div>
+
+    <div class="trace-card">
+      <div class="trace-head">
+        <span class="label">Set 4 · Back squat · Rep 3</span>
+        <span class="label mono">185 kg</span>
+      </div>
+      <svg class="trace-svg" viewBox="0 0 380 190" width="100%" height="190" role="img" aria-label="Bar velocity trace over one squat repetition, peaking during the concentric phase">
+        <line x1="30" y1="150" x2="360" y2="150" stroke="var(--rule)" stroke-width="1"></line>
+        <line x1="30" y1="20" x2="30" y2="150" stroke="var(--rule)" stroke-width="1"></line>
+        <text x="10" y="24" class="mono" font-size="9" fill="var(--muted)">m/s</text>
+        <text x="330" y="164" class="mono" font-size="9" fill="var(--muted)">time</text>
+        <path d="M30,150 C90,150 100,60 150,58 C190,57 200,140 230,142 C260,144 280,150 360,150" fill="none" stroke="var(--border)" stroke-width="2" stroke-dasharray="3 4"></path>
+        <path class="sweep" d="M30,150 C70,148 95,66 140,60 C170,56 175,150 360,150" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="420" stroke-dashoffset="0"></path>
+        <circle cx="140" cy="60" r="4" fill="var(--accent)"></circle>
+        <text x="148" y="52" class="mono" font-size="10" fill="var(--fg)">0.71</text>
+      </svg>
+      <div class="trace-readout">
+        <div>
+          <div class="v">0.71</div>
+          <div class="k">peak concentric m/s</div>
+        </div>
+        <div>
+          <div class="v">0.54</div>
+          <div class="k">mean velocity m/s</div>
+        </div>
+        <div>
+          <div class="v">12%</div>
+          <div class="k">velocity loss, set</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">How it works</p>
+        <h2>Three steps, zero lab coat.</h2>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="n mono">01</div>
+          <h3>Clip it to the bar</h3>
+          <p>The Movesense Flash snaps into a low-profile sleeve mount. Under 10 grams, no cables, pairs once over Bluetooth.</p>
+        </div>
+        <div class="step">
+          <div class="n mono">02</div>
+          <h3>Lift like normal</h3>
+          <p>The sensor's onboard IMU samples acceleration at 104 Hz. Vikt integrates it into bar position and velocity in real time, rep by rep.</p>
+        </div>
+        <div class="step">
+          <div class="n mono">03</div>
+          <h3>Autoregulate the set</h3>
+          <p>When velocity loss crosses your threshold, Vikt tells you to stop, drop weight, or push on — before the bar speed does it for you.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="zones">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Training zones</p>
+        <h2>Load by bar speed, not by feel.</h2>
+        <p>Vikt classifies every rep against published velocity-based training zones, calibrated per lift and per lifter over time.</p>
+      </div>
+      <div class="zones-wrap">
+        <table class="zones">
+          <thead>
+            <tr><th>Zone</th><th>Mean velocity</th><th>Training effect</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><span class="swatch" style="background:var(--accent)"></span>Speed–strength</td><td class="range">&gt; 0.75 m/s</td><td>Explosive work at submaximal loads</td></tr>
+            <tr><td><span class="swatch" style="background:var(--accent); opacity:.75"></span>Strength–speed</td><td class="range">0.50 – 0.75 m/s</td><td>Moderate loads, strength-hypertrophy</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone2)"></span>Accelerative strength</td><td class="range">0.30 – 0.50 m/s</td><td>Heavy doubles and triples</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone2); opacity:.7"></span>Maximal strength</td><td class="range">&lt; 0.30 m/s</td><td>Near-1RM singles, competition attempts</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="zones-note">Squat and bench thresholds shown; deadlift runs its own curve since concentric velocity at 1RM sits lower for the pull. Vikt recalibrates zone boundaries from your own logged maxes rather than population averages.</p>
+    </div>
+  </section>
+
+  <section id="who">
+    <div class="wrap who">
+      <div>
+        <p class="eyebrow">Built for the platform</p>
+        <h2>Scoped to competitive powerlifting, on purpose.</h2>
+        <div class="prose" style="margin-top:16px;">
+          <p>Vikt isn't a general fitness tracker with a barbell mode bolted on. Every zone, cue, and report is written for lifters training toward a total — squat, bench, deadlift — under federation rules, not for generic strength training.</p>
+        </div>
+      </div>
+      <div>
+        <div class="stat">
+          <div class="num mono">58,000+</div>
+          <div class="desc">competitive lifters post results through OpenPowerlifting-tracked federations each year</div>
+        </div>
+        <div class="stat">
+          <div class="num mono">104 Hz</div>
+          <div class="desc">IMU sampling rate — fine enough to resolve velocity loss within a single rep</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Pricing</p>
+        <h2>Software subscription. No hardware markup.</h2>
+        <p>Vikt runs on the Movesense sensor platform — we don't manufacture hardware, so there's no hardware margin baked into your bill.</p>
+      </div>
+      <div class="pricing">
+        <div class="plan">
+          <span class="tag">Lifter</span>
+          <span class="name">For your own training</span>
+          <span class="price mono">149 kr<span>/month</span></span>
+          <ul>
+            <li>Live velocity &amp; tempo per rep</li>
+            <li>Personal zone calibration</li>
+            <li>Set-by-set autoregulation cues</li>
+            <li>Training log export</li>
+          </ul>
+          <a class="btn-ghost" href="#cta">Start as a lifter</a>
+        </div>
+        <div class="plan featured">
+          <span class="tag hl">Coach</span>
+          <span class="name">For managing a squad</span>
+          <span class="price mono">89 kr<span>/lifter · month</span></span>
+          <ul>
+            <li>Everything in Lifter, per athlete</li>
+            <li>Squad dashboard across sessions</li>
+            <li>Meet-week readiness flags</li>
+            <li>Shared coaching notes</li>
+          </ul>
+          <a class="btn" href="#cta">Talk to us about your squad</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="rawdata">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">From the database · work in progress</p>
+        <h2>A real recorded set.</h2>
+        <p>Pulled live from Supabase, straight off a Movesense sensor, not the fictional demo above.</p>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Vertical bar velocity — raw session</h3>
+          <div class="chart-head-right">
+            <button class="btn-ghost" id="loadRawBtn" type="button">Load session</button>
+          </div>
+        </div>
+        <p class="chart-caption" id="rawStatus">Not loaded yet — click "Load session" to fetch it from Supabase.</p>
+        <svg id="rawChart" viewBox="0 0 640 260" role="img" aria-label="Vertical velocity over time for the left and right sensor, from one real recorded session" style="width:100%;height:auto;overflow:visible;margin-top:12px;"></svg>
+        <div class="chart-legend two" style="margin-top:10px;">
+          <span><i style="background:var(--chart-left)"></i>Left sleeve</span>
+          <span><i style="background:var(--chart-right)"></i>Right sleeve</span>
+        </div>
+        <p class="chart-caption">Raw, unprocessed sensor output — every point is one sample's vertical velocity over time. It isn't aligned into reps or a lift-cycle percentage yet, that's the next step; this card just proves the data is real and the fetch works.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta">
+    <div class="wrap">
+      <div class="cta-band">
+        <h2>Be in the first cohort on the platform.</h2>
+        <a class="btn" href="#top">Request early access</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a class="logo" href="#top" style="font-size:1.05rem;">VIKT<span class="dot">.</span></a>
+      <p class="fine" style="margin-top:6px;">A SportTech course project, built on the Movesense sensor platform.</p>
+    </div>
+    <div class="plates" aria-hidden="true">
+      <span style="background:#C0392B"></span>
+      <span style="background:#2247D6"></span>
+      <span style="background:#E8C158"></span>
+      <span style="background:#2E7D32"></span>
+      <span style="background:#EDEAE2; border:1px solid var(--border);"></span>
+    </div>
+  </div>
+</footer>
+</div><!-- /marketingView -->
+
+
+
+<div id="appView" hidden>
+  <header class="app-top">
+    <div class="wrap app-top-row">
+      <a class="logo" href="#" id="exitDemo">VIKT<span class="dot">.</span></a>
+      <nav class="applinks" role="tablist" id="exTabs">
+        <button class="apptab" data-ex="squat" role="tab" type="button">Squat</button>
+        <button class="apptab" data-ex="bench" role="tab" type="button">Bench Press</button>
+        <button class="apptab" data-ex="deadlift" role="tab" type="button">Deadlift</button>
+      </nav>
+      <span class="demo-badge" id="teamBadge">No team assigned</span>
+      <span class="demo-badge">Demo · fictional data</span>
+      <button class="theme-toggle" type="button" aria-label="Toggle color theme">
+        <svg class="icon-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="10" y1="1" y2="3.4" x2="10"></line><line x1="10" y1="16.6" y2="19" x2="10"></line><line x1="1" y1="10" x2="3.4" y2="10"></line><line x1="16.6" y1="10" x2="19" y2="10"></line><line x1="3.9" y1="3.9" x2="5.6" y2="5.6"></line><line x1="14.4" y1="14.4" x2="16.1" y2="16.1"></line><line x1="3.9" y1="16.1" x2="5.6" y2="14.4"></line><line x1="14.4" y1="5.6" x2="16.1" y2="3.9"></line></g></svg>
+        <svg class="icon-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" style="display:none"><path fill="currentColor" d="M16.5 12.5A7 7 0 0 1 7.5 3.5a7 7 0 1 0 9 9z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="wrap app-body">
+
+    <section class="app-hero">
+      <div>
+        <p class="eyebrow" id="exEyebrow">Squat</p>
+        <h2 id="exHeading">Est. 1RM 140 kg</h2>
+        <p class="exit-link"><a href="#" id="exitDemo2">← Back to overview</a></p>
+      </div>
+      <form class="log-form" id="logForm">
+        <label for="logWeight">Log a set</label>
+        <div class="log-row">
+          <input type="number" id="logWeight" inputmode="decimal" step="0.5" min="1" placeholder="Weight (kg)" required>
+          <button class="btn" type="submit">Log set</button>
+        </div>
+        <p class="log-note">Just enter the load — Vikt counts reps, bar speed and bar path from the sensor automatically.</p>
+      </form>
+    </section>
+
+    <section class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Bar speed by lift cycle</h3>
+          <div class="chart-head-right">
+            <div class="chart-legend" id="velLegend"></div>
+          </div>
+        </div>
+        <div class="chart-visual" data-chart="velocity" role="button" tabindex="0" aria-label="Enlarge: bar speed by lift cycle">
+          <svg id="velChart" viewBox="0 0 640 260" role="img" aria-label="Bar speed across the lift cycle, one line per rep"></svg>
+        </div>
+        <p class="chart-caption">Every rep in the selected set, aligned on one lift cycle instead of time — the fade tracks fatigue rep to rep.</p>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Bar path — left vs right</h3>
+          <div class="chart-head-right">
+            <div class="rep-pills" id="pathPills"></div>
+          </div>
+        </div>
+        <div class="chart-visual" data-chart="path" role="button" tabindex="0" aria-label="Enlarge: bar path left vs right">
+          <svg id="pathChart" viewBox="0 0 640 260" role="img" aria-label="Vertical bar position across the lift cycle for the left and right sleeve"></svg>
+        </div>
+        <div class="chart-legend two">
+          <span><i style="background:var(--chart-left)"></i>Left sleeve</span>
+          <span><i style="background:var(--chart-right)"></i>Right sleeve</span>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <h3>Bar path — front vs back</h3>
+          <div class="chart-head-right">
+            <div class="chart-legend" id="driftLegend"></div>
+          </div>
+        </div>
+        <div class="chart-visual" data-chart="drift" role="button" tabindex="0" aria-label="Enlarge: bar path front vs back">
+          <svg id="driftChart" viewBox="0 0 640 260" role="img" aria-label="Horizontal bar drift across the lift cycle, one line per rep"></svg>
+        </div>
+        <p class="chart-caption" id="driftCaption"></p>
+      </div>
+    </section>
+
+    <section class="zone-readout">
+      <div class="head-row">
+        <h3>Training effect, this set</h3>
+        <span class="mono muted-small" id="setSummary"></span>
+      </div>
+      <div class="rep-zones" id="repZones"></div>
+    </section>
+
+    <section class="history">
+      <h3>History</h3>
+      <div class="history-wrap">
+        <table class="history-table" id="historyTable">
+          <thead>
+            <tr><th>Session</th><th>Weight</th><th>Reps</th><th>Mean velocity</th><th>Zone</th></tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="zone-modal-overlay" id="zoneModalOverlay" hidden>
+    <div class="zone-modal" role="dialog" aria-modal="true" aria-labelledby="zoneModalTitle">
+      <button type="button" class="zone-modal-close" id="zoneModalClose" aria-label="Close">×</button>
+      <div class="zone-modal-tabs" id="zoneModalTabs"></div>
+      <div class="zone-modal-body">
+        <p class="eyebrow" id="zoneModalRange"></p>
+        <h3 id="zoneModalTitle"></h3>
+        <p id="zoneModalDesc"></p>
+        <p class="zone-modal-benefit"><strong>Why it matters: </strong><span id="zoneModalBenefit"></span></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-modal-overlay" id="chartModalOverlay" hidden>
+    <button type="button" class="chart-nav-arrow chart-nav-prev" id="chartTypePrev" aria-label="Previous graph">‹</button>
+    <div class="chart-modal" role="dialog" aria-modal="true" aria-labelledby="chartModalTitle">
+      <button type="button" class="zone-modal-close" id="chartModalClose" aria-label="Close">×</button>
+      <div class="chart-card modal-chart">
+        <div class="chart-head">
+          <h3 id="chartModalTitle"></h3>
+          <div class="chart-head-right">
+            <div class="chart-legend" id="chartModalLegend"></div>
+            <div class="rep-pill-nav">
+              <button type="button" class="rep-pill-arrow" id="modalRepPrev" aria-label="Previous rep">‹</button>
+              <div class="rep-pills" id="chartModalPills"></div>
+              <button type="button" class="rep-pill-arrow" id="modalRepNext" aria-label="Next rep">›</button>
+            </div>
+          </div>
+        </div>
+        <svg id="chartModalSvg" viewBox="0 0 640 260" role="img"></svg>
+        <div class="chart-legend two" id="chartModalTwoLegend" hidden>
+          <span><i style="background:var(--chart-left)"></i>Left sleeve</span>
+          <span><i style="background:var(--chart-right)"></i>Right sleeve</span>
+        </div>
+        <p class="chart-caption" id="chartModalCaption"></p>
+      </div>
+    </div>
+    <button type="button" class="chart-nav-arrow chart-nav-next" id="chartTypeNext" aria-label="Next graph">›</button>
+  </div>
+</div><!-- /appView -->
+
+<div class="chart-modal-overlay" id="authModalOverlay" hidden>
+  <div class="chart-modal" role="dialog" aria-modal="true" aria-labelledby="authModalTitle" style="max-width:420px;">
+    <button type="button" class="zone-modal-close" id="authModalClose" aria-label="Close">×</button>
+    <div class="chart-card modal-chart">
+      <div class="chart-head">
+        <h3 id="authModalTitle">Log in</h3>
+      </div>
+      <p class="chart-caption" id="authInviteNote" hidden></p>
+
+      <form id="authForm" style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <div class="log-row">
+          <input type="email" id="authEmail" placeholder="Email" autocomplete="username" required>
+        </div>
+        <div class="log-row">
+          <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" minlength="6" required>
+        </div>
+        <div class="log-row">
+          <button class="btn" type="submit" id="authSubmitBtn" style="flex:1; justify-content:center;">Log in</button>
+        </div>
+        <p class="log-note" id="authStatus"></p>
+        <p class="log-note">
+          <span id="authToggleText">Don't have an account?</span>
+          <button type="button" class="zone-link" id="authToggleMode">Sign up</button>
+        </p>
+      </form>
+
+      <div id="loggedInPanel" hidden>
+        <p class="chart-caption" id="loggedInStatus"></p>
+        <div id="adminInvitePanel" hidden style="margin-top:14px; padding-top:14px; border-top:1px solid var(--border);">
+          <p class="chart-caption" style="margin-top:0;">Invite someone to your team</p>
+          <div class="log-row" style="margin-top:8px;">
+            <select id="inviteRoleSelect" style="flex:1; background:var(--bg); border:1px solid var(--border); border-radius:3px; padding:10px 12px; font-family:'IBM Plex Sans',sans-serif; color:var(--fg);">
+              <option value="member">Member (lifter)</option>
+              <option value="coach">Coach</option>
+            </select>
+            <button class="btn-ghost" type="button" id="createInviteBtn">Generate link</button>
+          </div>
+          <div class="log-row" id="inviteLinkRow" style="margin-top:8px;" hidden>
+            <input type="text" id="inviteLinkOut" readonly>
+            <button class="btn-ghost" type="button" id="copyInviteBtn">Copy</button>
+          </div>
+          <p class="log-note" id="inviteStatus"></p>
+        </div>
+        <button class="btn" type="button" id="goToDemoBtn" style="margin-top:14px;">Go to demo</button>
+        <button class="btn-ghost" type="button" id="logoutBtn" style="margin-top:10px;">Log out</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /authModal -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------------- data model ---------------- */
+  // Fictional lifter, fictional load-velocity profile per lift.
+  // V(%1RM) = a - b * (%1RM/100), calibrated so V(100%) = v1RM (approx. published VBT anchors).
+  var EXERCISES = {
+    squat: {
+      name: "Back Squat",
+      oneRM: 140,
+      a: 1.05, b: 0.73,
+      cyclePath: "down-up",           // top -> bottom -> top
+      cycleLabels: ["Top", "Bottom (depth)", "Top"],
+      driftCenters: [50],             // forward drift risk is at depth
+      driftCaption: "Positive = the bar drifts forward, toward your toes; negative = back toward your heels.",
+      zones: [
+        { min: 0.75, label: "Speed–strength" },
+        { min: 0.50, label: "Strength–speed" },
+        { min: 0.30, label: "Accelerative strength" },
+        { min: 0,    label: "Maximal strength" }
+      ],
+      history: [
+        { date: "Aug 9",  time: "6:10 PM", weight: 100 },
+        { date: "Aug 16", time: "6:05 PM", weight: 105 },
+        { date: "Aug 23", time: "5:50 PM", weight: 110 },
+        { date: "Aug 30", time: "6:20 PM", weight: 112.5 },
+        { date: "Sep 6",  time: "6:00 PM", weight: 115 },
+        { date: "Sep 12", time: "6:15 PM", weight: 117.5 }
+      ]
+    },
+    bench: {
+      name: "Bench Press",
+      oneRM: 100,
+      a: 0.90, b: 0.73,
+      cyclePath: "down-up",           // lockout -> chest -> lockout
+      cycleLabels: ["Top (lockout)", "Bottom (chest)", "Top (lockout)"],
+      driftCenters: [50],             // drift risk is off the chest
+      driftCaption: "Positive = the bar drifts toward the rack, over your face; negative = back toward your hips.",
+      zones: [
+        { min: 0.75, label: "Speed–strength" },
+        { min: 0.50, label: "Strength–speed" },
+        { min: 0.30, label: "Accelerative strength" },
+        { min: 0,    label: "Maximal strength" }
+      ],
+      history: [
+        { date: "Aug 9",  time: "5:40 PM", weight: 75 },
+        { date: "Aug 16", time: "5:35 PM", weight: 77.5 },
+        { date: "Aug 23", time: "5:50 PM", weight: 80 },
+        { date: "Aug 30", time: "5:45 PM", weight: 82.5 },
+        { date: "Sep 6",  time: "5:55 PM", weight: 82.5 },
+        { date: "Sep 12", time: "5:50 PM", weight: 85 }
+      ]
+    },
+    deadlift: {
+      name: "Deadlift",
+      oneRM: 170,
+      a: 0.85, b: 0.70,
+      cyclePath: "up-down",           // floor -> lockout -> floor
+      cycleLabels: ["Bottom (floor)", "Top (lockout)", "Bottom (floor)"],
+      driftCenters: [15, 85],         // drift risk is breaking the floor and re-setting
+      driftCaption: "Positive = the bar drifts away from your shins, out in front; negative = back into your shins.",
+      zones: [
+        { min: 0.50, label: "Speed–strength" },
+        { min: 0.30, label: "Strength–speed" },
+        { min: 0.15, label: "Accelerative strength" },
+        { min: 0,    label: "Maximal strength" }
+      ],
+      history: [
+        { date: "Aug 9",  time: "7:05 PM", weight: 130 },
+        { date: "Aug 16", time: "7:00 PM", weight: 135 },
+        { date: "Aug 23", time: "7:10 PM", weight: 140 },
+        { date: "Aug 30", time: "6:55 PM", weight: 142.5 },
+        { date: "Sep 6",  time: "7:15 PM", weight: 145 },
+        { date: "Sep 12", time: "7:05 PM", weight: 150 }
+      ]
+    }
+  };
+
+  var ZONE_INFO = {
+    "Speed–strength": {
+      desc: "Light-to-moderate loads, roughly 30–60% of 1RM, moved with maximum intended acceleration.",
+      benefit: "Trains the nervous system to produce force fast — improves rate of force development and bar acceleration off the bottom. It carries over to explosiveness, but does little on its own to raise your 1RM."
+    },
+    "Strength–speed": {
+      desc: "Moderate loads, roughly 60–80% of 1RM — heavier than speed-strength work, still lifted with intent to move fast even though the bar itself moves slower.",
+      benefit: "The bridge between raw strength and speed: builds the ability to move genuinely heavy weight quickly. Typical territory for hypertrophy-strength blocks and the bulk of a training cycle's volume."
+    },
+    "Accelerative strength": {
+      desc: "Heavy loads, roughly 80–90% of 1RM, usually doubles and triples — bar speed drops, but the intent to accelerate stays.",
+      benefit: "The main zone for competition-lift strength work. Builds maximal strength and grooves technical consistency under a load close to what you'll actually face on the platform."
+    },
+    "Maximal strength": {
+      desc: "Near-1RM loads, 90%+, typically singles — competition-style attempts.",
+      benefit: "Trains maximum motor-unit recruitment and the ability to produce force at very slow bar speeds. Essential for peaking toward a meet, but taxing on the nervous system — used sparingly, not as everyday volume."
+    }
+  };
+
+  function zoneRangeLabel(ex, idx) {
+    var z = ex.zones[idx];
+    if (idx === 0) return "> " + z.min.toFixed(2) + " m/s";
+    var upper = ex.zones[idx - 1].min;
+    if (z.min === 0) return "< " + upper.toFixed(2) + " m/s";
+    return z.min.toFixed(2) + "–" + upper.toFixed(2) + " m/s";
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function zoneFor(ex, v) {
+    for (var i = 0; i < ex.zones.length; i++) {
+      if (v >= ex.zones[i].min) return ex.zones[i].label;
+    }
+    return ex.zones[ex.zones.length - 1].label;
+  }
+
+  // Deterministic set simulator: given a load, derive first-rep velocity from
+  // the load-velocity profile, estimate reps-to-near-failure (Brzycki-style),
+  // and taper velocity across the reps actually performed.
+  function simulateSet(weight, ex) {
+    var pct = clamp((weight / ex.oneRM) * 100, 30, 105);
+    var v1 = Math.max(0.05, ex.a - ex.b * (pct / 100));
+    var maxReps = clamp((102.78 - pct) / 2.78, 1, 20);
+    var reps = clamp(Math.round(maxReps) - 1, 1, 15);
+    var lossFraction = clamp((reps / maxReps) * 0.38, 0, 0.55);
+    var vLast = v1 * (1 - lossFraction);
+    var velocities = [];
+    for (var i = 0; i < reps; i++) {
+      var t = reps === 1 ? 0 : i / (reps - 1);
+      var tc = Math.pow(t, 1.15);
+      velocities.push(+(v1 - (v1 - vLast) * tc).toFixed(3));
+    }
+    return { pct: pct, v1: v1, reps: reps, velocities: velocities, lossPct: lossFraction * 100 };
+  }
+
+  /* ---------------- phase-curve generators ---------------- */
+  function bump(p, center, width, amp) {
+    var d = (p - center) / width;
+    return amp * Math.exp(-d * d);
+  }
+
+  function velocityCurve(meanV) {
+    var peakCon = meanV * 1.25;
+    var peakEcc = peakCon * 0.65;
+    var pts = [];
+    for (var p = 0; p <= 100; p += 2) {
+      var v = bump(p, 25, 14, peakEcc) + bump(p, 75, 14, peakCon);
+      pts.push({ p: p, v: Math.max(0, v) });
+    }
+    return pts;
+  }
+
+  function barPathCurve(pathDir, phaseShift, ampScale) {
+    var amp = 0.94 * ampScale;
+    var pts = [];
+    for (var p = 0; p <= 100; p += 2) {
+      var g = amp * Math.exp(-Math.pow((p - 50 - phaseShift) / 25, 2));
+      var v = pathDir === "down-up" ? (1 - g) : g;
+      pts.push({ p: p, v: clamp(v, 0, 1) });
+    }
+    return pts;
+  }
+
+  // Horizontal (front/back) bar drift, in cm from a vertical reference line.
+  // A small early backward shift, then a forward bump at each exercise's
+  // risk phase (deeper into the lift, and growing rep to rep with fatigue).
+  function driftCurve(ex, amp) {
+    var pts = [];
+    for (var p = 0; p <= 100; p += 2) {
+      var back = -0.35 * amp * Math.exp(-Math.pow((p - 12) / 10, 2));
+      var fwd = 0;
+      ex.driftCenters.forEach(function (c) { fwd += amp * Math.exp(-Math.pow((p - c) / 16, 2)); });
+      pts.push({ p: p, v: back + fwd });
+    }
+    return pts;
+  }
+
+  /* ---------------- svg chart helpers ---------------- */
+  var NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) {
+    var el = document.createElementNS(NS, tag);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function pathFromPoints(pts, xScale, yScale) {
+    return pts.map(function (pt, i) {
+      return (i === 0 ? "M" : "L") + xScale(pt.p).toFixed(1) + "," + yScale(pt.v).toFixed(1);
+    }).join(" ");
+  }
+
+  var M = { l: 46, r: 14, t: 14, b: 34 };
+  var W = 640, H = 260;
+  function xScale(p) { return M.l + (p / 100) * (W - M.l - M.r); }
+  function makeYScale(yMax) {
+    return function (v) { return H - M.b - (v / yMax) * (H - M.t - M.b); };
+  }
+  function makeYScaleRange(yMin, yMax) {
+    return function (v) { return H - M.b - ((v - yMin) / (yMax - yMin)) * (H - M.t - M.b); };
+  }
+
+  function drawAxes(svg, cycleLabels, yTicks, yFmt, zeroY) {
+    // gridlines + y labels
+    yTicks.forEach(function (t) {
+      var y = t.y;
+      svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: y, y2: y, stroke: "var(--chart-grid)", "stroke-width": 1 }));
+      var lbl = svgEl("text", { x: M.l - 10, y: y + 3, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+      lbl.textContent = yFmt(t.v);
+      svg.appendChild(lbl);
+    });
+    // x axis line
+    svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b, stroke: "var(--rule)", "stroke-width": 1 }));
+    // emphasized zero reference line, for charts whose domain crosses zero
+    if (typeof zeroY === "number" && Math.abs(zeroY - (H - M.b)) > 0.5) {
+      svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: zeroY, y2: zeroY, stroke: "var(--muted)", "stroke-width": 1.2 }));
+    }
+    // x labels at 0 / 50 / 100 using exercise cycle wording
+    [0, 50, 100].forEach(function (p, i) {
+      var anchor = p === 0 ? "start" : (p === 100 ? "end" : "middle");
+      var t = svgEl("text", { x: xScale(p), y: H - 12, "text-anchor": anchor, class: "mono", "font-size": 9, fill: "var(--muted)" });
+      t.textContent = cycleLabels[i];
+      svg.appendChild(t);
+      svg.appendChild(svgEl("line", { x1: xScale(p), x2: xScale(p), y1: M.t, y2: H - M.b, stroke: "var(--chart-grid)", "stroke-width": 1, "stroke-dasharray": p === 50 ? "2 3" : "0" }));
+    });
+  }
+
+  function niceMax(v) {
+    var step = 0.2;
+    return Math.max(step, Math.ceil((v * 1.15) / step) * step);
+  }
+  function niceAbsMax(v, step) {
+    return Math.max(step, Math.ceil((v * 1.2) / step) * step);
+  }
+
+  /* ---------------- render: velocity-by-cycle chart ---------------- */
+  function renderVelocityChart(ex, sim, target, selectedRep) {
+    target = target || { svg: "velChart", legend: "velLegend" };
+    if (selectedRep === undefined) selectedRep = null;
+    var svg = document.getElementById(target.svg);
+    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    var yMax = niceMax(Math.max.apply(null, sim.velocities.map(function (v) { return v * 1.25; })));
+    var yS = makeYScale(yMax);
+    var yTicks = [0, 0.25, 0.5, 0.75, 1].map(function (f) { return { v: +(yMax * f).toFixed(2), y: yS(yMax * f) }; });
+    drawAxes(svg, ex.cycleLabels, yTicks, function (v) { return v.toFixed(2); });
+
+    var n = sim.velocities.length;
+    var indices = selectedRep === null ? sim.velocities.map(function (_, i) { return i; }) : [clamp(selectedRep, 0, n - 1)];
+    var seriesPts = indices.map(function (i) { return { i: i, pts: velocityCurve(sim.velocities[i]) }; });
+    seriesPts.forEach(function (s) {
+      var fade = selectedRep === null ? (n === 1 ? 1 : 1 - (s.i / (n - 1)) * 0.65) : 1;
+      var strokeWidth = selectedRep === null ? 2.2 : 2.6;
+      var d = pathFromPoints(s.pts, xScale, yS);
+      var path = svgEl("path", { d: d, fill: "none", stroke: "var(--accent)", "stroke-width": strokeWidth, "stroke-linecap": "round", opacity: fade.toFixed(2) });
+      svg.appendChild(path);
+    });
+
+    // y axis title (top-right, clear of the tick labels)
+    var yt = svgEl("text", { x: W - M.r, y: M.t + 4, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    yt.textContent = "m/s";
+    svg.appendChild(yt);
+
+    // legend: sequential fade, rep 1 -> rep n (only meaningful when showing all reps)
+    var legend = document.getElementById(target.legend);
+    if (legend) {
+      legend.innerHTML = "";
+      if (selectedRep === null) {
+        var l1 = document.createElement("span");
+        l1.innerHTML = '<i style="background:var(--accent)"></i>Rep 1';
+        var l2 = document.createElement("span");
+        l2.innerHTML = '<i style="background:var(--accent); opacity:.4"></i>Rep ' + n;
+        legend.appendChild(l1); legend.appendChild(l2);
+      }
+    }
+
+    attachHover(svg, "vel-tt", function (phase) {
+      return seriesPts.map(function (s) {
+        var pt = nearestPoint(s.pts, phase);
+        return "Rep " + (s.i + 1) + ": " + pt.v.toFixed(2) + " m/s";
+      });
+    });
+  }
+
+  /* ---------------- render: left/right bar path chart ---------------- */
+  var currentPathRep = 0;
+  function repPathCurves(ex, i) {
+    var rightShift = clamp(3 + i * 1.8, 0, 11);
+    var rightAmp = 1 - clamp(0.035 + i * 0.02, 0, 0.16);
+    return { left: barPathCurve(ex.cyclePath, 0, 1), right: barPathCurve(ex.cyclePath, rightShift, rightAmp) };
+  }
+  function drawPathCurves(svg, ex, sim, selectedRep) {
+    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    var yTicks = [0, 0.25, 0.5, 0.75, 1].map(function (f) { return { v: f, y: makeYScale(1)(f) }; });
+    var yS = makeYScale(1);
+    drawAxes(svg, ex.cycleLabels, yTicks, function (v) { return v.toFixed(2); });
+
+    var shown = [];
+    if (selectedRep === null) {
+      var n = sim.reps;
+      for (var i = 0; i < n; i++) {
+        var c = repPathCurves(ex, i);
+        var fade = n === 1 ? 1 : 1 - (i / (n - 1)) * 0.65;
+        svg.appendChild(svgEl("path", { d: pathFromPoints(c.left, xScale, yS), fill: "none", stroke: "var(--chart-left)", "stroke-width": 2.2, "stroke-linecap": "round", opacity: fade.toFixed(2) }));
+        svg.appendChild(svgEl("path", { d: pathFromPoints(c.right, xScale, yS), fill: "none", stroke: "var(--chart-right)", "stroke-width": 2.2, "stroke-linecap": "round", opacity: fade.toFixed(2) }));
+        shown.push({ i: i, left: c.left, right: c.right });
+      }
+    } else {
+      var idx = clamp(selectedRep, 0, sim.reps - 1);
+      var c1 = repPathCurves(ex, idx);
+      svg.appendChild(svgEl("path", { d: pathFromPoints(c1.left, xScale, yS), fill: "none", stroke: "var(--chart-left)", "stroke-width": 2.6, "stroke-linecap": "round" }));
+      svg.appendChild(svgEl("path", { d: pathFromPoints(c1.right, xScale, yS), fill: "none", stroke: "var(--chart-right)", "stroke-width": 2.6, "stroke-linecap": "round" }));
+      shown.push({ i: idx, left: c1.left, right: c1.right });
+    }
+
+    var yt = svgEl("text", { x: W - M.r, y: M.t + 4, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    yt.textContent = "height";
+    svg.appendChild(yt);
+
+    attachHover(svg, "path-tt", function (phase) {
+      if (shown.length === 1) {
+        var l = nearestPoint(shown[0].left, phase), r = nearestPoint(shown[0].right, phase);
+        return ["Left: " + (l.v * 100).toFixed(0) + "%", "Right: " + (r.v * 100).toFixed(0) + "%"];
+      }
+      return shown.map(function (s) {
+        var l = nearestPoint(s.left, phase), r = nearestPoint(s.right, phase);
+        return "Rep " + (s.i + 1) + ": L " + (l.v * 100).toFixed(0) + "% · R " + (r.v * 100).toFixed(0) + "%";
+      });
+    });
+  }
+  function renderPathChart(ex, sim, target) {
+    target = target || { svg: "pathChart", pills: "pathPills" };
+    var pills = document.getElementById(target.pills);
+    pills.innerHTML = "";
+    currentPathRep = clamp(currentPathRep, 0, sim.reps - 1);
+    for (var i = 0; i < sim.reps; i++) {
+      (function (idx) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "rep-pill";
+        b.textContent = "Rep " + (idx + 1);
+        b.setAttribute("aria-pressed", idx === currentPathRep ? "true" : "false");
+        b.addEventListener("click", function () { currentPathRep = idx; renderPathChart(ex, sim, target); });
+        pills.appendChild(b);
+      })(i);
+    }
+    var svg = document.getElementById(target.svg);
+    drawPathCurves(svg, ex, sim, currentPathRep);
+  }
+
+  /* ---------------- render: front/back drift chart ---------------- */
+  function renderDriftChart(ex, sim, target, selectedRep) {
+    target = target || { svg: "driftChart", legend: "driftLegend" };
+    if (selectedRep === undefined) selectedRep = null;
+    var svg = document.getElementById(target.svg);
+    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    var n = sim.velocities.length;
+    var amps = sim.velocities.map(function (v, i) { return clamp(1.0 + i * 0.7, 0, 5.5); });
+    var indices = selectedRep === null ? amps.map(function (_, i) { return i; }) : [clamp(selectedRep, 0, n - 1)];
+    var seriesPts = indices.map(function (i) { return { i: i, pts: driftCurve(ex, amps[i]) }; });
+
+    var maxAbs = 0;
+    seriesPts.forEach(function (s) { s.pts.forEach(function (pt) { maxAbs = Math.max(maxAbs, Math.abs(pt.v)); }); });
+    var yBound = niceAbsMax(maxAbs, 1);
+    var yS = makeYScaleRange(-yBound, yBound);
+    var yTicks = [-1, -0.5, 0, 0.5, 1].map(function (f) { return { v: +(yBound * f).toFixed(1), y: yS(yBound * f) }; });
+    drawAxes(svg, ex.cycleLabels, yTicks, function (v) { return (v > 0 ? "+" : "") + v.toFixed(1); }, yS(0));
+
+    seriesPts.forEach(function (s) {
+      var fade = selectedRep === null ? (n === 1 ? 1 : 1 - (s.i / (n - 1)) * 0.65) : 1;
+      var strokeWidth = selectedRep === null ? 2.2 : 2.6;
+      var d = pathFromPoints(s.pts, xScale, yS);
+      var path = svgEl("path", { d: d, fill: "none", stroke: "var(--accent)", "stroke-width": strokeWidth, "stroke-linecap": "round", opacity: fade.toFixed(2) });
+      svg.appendChild(path);
+    });
+
+    var yt = svgEl("text", { x: W - M.r, y: M.t + 4, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    yt.textContent = "cm";
+    svg.appendChild(yt);
+
+    var legend = document.getElementById(target.legend);
+    if (legend) {
+      legend.innerHTML = "";
+      if (selectedRep === null) {
+        var l1 = document.createElement("span");
+        l1.innerHTML = '<i style="background:var(--accent)"></i>Rep 1';
+        var l2 = document.createElement("span");
+        l2.innerHTML = '<i style="background:var(--accent); opacity:.4"></i>Rep ' + n;
+        legend.appendChild(l1); legend.appendChild(l2);
+      }
+    }
+
+    attachHover(svg, "drift-tt", function (phase) {
+      return seriesPts.map(function (s) {
+        var pt = nearestPoint(s.pts, phase);
+        return "Rep " + (s.i + 1) + ": " + (pt.v > 0 ? "+" : "") + pt.v.toFixed(1) + " cm";
+      });
+    });
+  }
+
+  function nearestPoint(pts, phase) {
+    var best = pts[0], bd = Infinity;
+    pts.forEach(function (pt) {
+      var d = Math.abs(pt.p - phase);
+      if (d < bd) { bd = d; best = pt; }
+    });
+    return best;
+  }
+
+  /* ---------------- shared hover crosshair + tooltip ---------------- */
+  function attachHover(svg, ttId, getLines) {
+    var wrap = svg.closest(".chart-card");
+    wrap.style.position = "relative";
+    var tt = wrap.querySelector(".chart-tooltip");
+    if (!tt) {
+      tt = document.createElement("div");
+      tt.className = "chart-tooltip";
+      wrap.appendChild(tt);
+    }
+    var crosshair = svgEl("line", { class: "crosshair", y1: M.t, y2: H - M.b, stroke: "var(--muted)", "stroke-width": 1, opacity: 0 });
+    svg.appendChild(crosshair);
+
+    // Store the current data-lookup fn on the svg node itself; bind the
+    // pointer listeners only once so repeated re-renders don't stack handlers.
+    svg.__getLines = getLines;
+    svg.__crosshair = crosshair;
+    if (svg.dataset.hoverBound) return;
+    svg.dataset.hoverBound = "1";
+
+    function move(evt) {
+      var ch = svg.__crosshair;
+      var rect = svg.getBoundingClientRect();
+      var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+      var xIn = ((clientX - rect.left) / rect.width) * W;
+      var phase = clamp(((xIn - M.l) / (W - M.l - M.r)) * 100, 0, 100);
+      ch.setAttribute("x1", xScale(phase));
+      ch.setAttribute("x2", xScale(phase));
+      ch.setAttribute("opacity", 1);
+      var lines = svg.__getLines(phase);
+      tt.innerHTML = lines.join("<br>");
+      var leftPct = ((clientX - rect.left) / rect.width) * 100;
+      tt.style.left = clamp(leftPct, 8, 92) + "%";
+      tt.style.top = (svg.offsetTop + 8) + "px";
+      tt.style.opacity = 1;
+    }
+    function leave() { svg.__crosshair.setAttribute("opacity", 0); tt.style.opacity = 0; }
+
+    svg.addEventListener("mousemove", move);
+    svg.addEventListener("mouseleave", leave);
+    svg.addEventListener("touchmove", move, { passive: true });
+    svg.addEventListener("touchend", leave);
+  }
+
+  /* ---------------- rep zone chips ---------------- */
+  function renderRepZones(ex, sim) {
+    var wrap = document.getElementById("repZones");
+    wrap.innerHTML = "";
+    sim.velocities.forEach(function (v, i) {
+      var chip = document.createElement("div");
+      chip.className = "rep-chip";
+      chip.innerHTML =
+        '<span class="rn">Rep ' + (i + 1) + '</span>' +
+        '<span class="rv">' + v.toFixed(2) + ' m/s</span>' +
+        '<button type="button" class="rz zone-link" data-zone="' + zoneFor(ex, v) + '">' + zoneFor(ex, v) + '</button>';
+      wrap.appendChild(chip);
+    });
+    var summary = document.getElementById("setSummary");
+    summary.textContent = sim.pct.toFixed(0) + "% e1RM · " + sim.lossPct.toFixed(0) + "% velocity loss across the set";
+  }
+
+  /* ---------------- history table ---------------- */
+  function renderHistory(exKey, ex, selectedIdx) {
+    var body = document.getElementById("historyBody");
+    body.innerHTML = "";
+    ex.history.forEach(function (row, idx) {
+      var sim = simulateSet(row.weight, ex);
+      var tr = document.createElement("tr");
+      tr.setAttribute("aria-current", idx === selectedIdx ? "true" : "false");
+      tr.innerHTML =
+        "<td>" + row.date + (row.time ? ' <span class="muted-small">' + row.time + "</span>" : "") + "</td>" +
+        '<td class="num">' + row.weight + " kg</td>" +
+        '<td class="num">' + sim.reps + "</td>" +
+        '<td class="num">' + sim.velocities[0].toFixed(2) + " m/s</td>" +
+        '<td><button type="button" class="zone-link" data-zone="' + zoneFor(ex, sim.velocities[0]) + '">' + zoneFor(ex, sim.velocities[0]) + "</button></td>";
+      tr.addEventListener("click", function () { selectSet(exKey, idx); });
+      body.appendChild(tr);
+    });
+  }
+
+  /* ---------------- state + wiring ---------------- */
+  var state = { ex: "squat", selected: {} };
+  ["squat", "bench", "deadlift"].forEach(function (k) { state.selected[k] = EXERCISES[k].history.length - 1; });
+
+  function selectSet(exKey, idx) {
+    state.selected[exKey] = idx;
+    renderExercise(exKey);
+  }
+
+  function renderExercise(exKey) {
+    state.ex = exKey;
+    var ex = EXERCISES[exKey];
+    document.getElementById("exEyebrow").textContent = ex.name;
+    document.getElementById("exHeading").textContent = "Est. 1RM " + ex.oneRM + " kg";
+
+    document.querySelectorAll(".apptab").forEach(function (b) {
+      b.setAttribute("aria-selected", b.dataset.ex === exKey ? "true" : "false");
+    });
+
+    var idx = clamp(state.selected[exKey], 0, ex.history.length - 1);
+    var row = ex.history[idx];
+    var sim = simulateSet(row.weight, ex);
+    currentPathRep = 0;
+
+    renderVelocityChart(ex, sim);
+    renderPathChart(ex, sim);
+    renderDriftChart(ex, sim);
+    renderRepZones(ex, sim);
+    renderHistory(exKey, ex, idx);
+    document.getElementById("driftCaption").textContent = ex.driftCaption;
+    if (currentModalChart && !document.getElementById("chartModalOverlay").hidden) {
+      openChartModal(currentModalChart);
+    }
+  }
+
+  /* ---------------- log-a-set form ---------------- */
+  document.getElementById("logForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var input = document.getElementById("logWeight");
+    var weight = parseFloat(input.value);
+    if (!weight || weight <= 0) return;
+    var ex = EXERCISES[state.ex];
+    var now = new Date();
+    var dateStr = now.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    var timeStr = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    ex.history.push({ date: "Today (" + dateStr + ")", time: timeStr, weight: weight });
+    state.selected[state.ex] = ex.history.length - 1;
+    input.value = "";
+    renderExercise(state.ex);
+  });
+
+  /* ---------------- exercise tabs ---------------- */
+  document.querySelectorAll(".apptab").forEach(function (b) {
+    b.addEventListener("click", function () { renderExercise(b.dataset.ex); });
+  });
+
+  /* ---------------- open / close demo ---------------- */
+  var marketing = document.getElementById("marketingView");
+  var app = document.getElementById("appView");
+  function openDemo() {
+    marketing.hidden = true;
+    app.hidden = false;
+    window.scrollTo(0, 0);
+    renderExercise(state.ex);
+    if (typeof updateTeamBadge === "function") updateTeamBadge();
+  }
+  function closeDemo() {
+    app.hidden = true;
+    marketing.hidden = false;
+    window.scrollTo(0, 0);
+  }
+  document.getElementById("exitDemo").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
+  document.getElementById("exitDemo2").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
+
+  /* ---------------- zone info modal ---------------- */
+  function renderZoneTabs(activeLabel) {
+    var ex = EXERCISES[state.ex];
+    var tabs = document.getElementById("zoneModalTabs");
+    tabs.innerHTML = "";
+    ex.zones.forEach(function (z) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "zone-tab";
+      b.textContent = z.label;
+      b.setAttribute("aria-selected", z.label === activeLabel ? "true" : "false");
+      b.addEventListener("click", function () { showZoneContent(z.label); });
+      tabs.appendChild(b);
+    });
+  }
+  function showZoneContent(label) {
+    var ex = EXERCISES[state.ex];
+    var idx = ex.zones.findIndex(function (z) { return z.label === label; });
+    if (idx < 0) idx = 0;
+    var info = ZONE_INFO[ex.zones[idx].label];
+    document.getElementById("zoneModalRange").textContent = ex.name + " · " + zoneRangeLabel(ex, idx);
+    document.getElementById("zoneModalTitle").textContent = ex.zones[idx].label;
+    document.getElementById("zoneModalDesc").textContent = info.desc;
+    document.getElementById("zoneModalBenefit").textContent = info.benefit;
+    document.querySelectorAll(".zone-tab").forEach(function (b) {
+      b.setAttribute("aria-selected", b.textContent === ex.zones[idx].label ? "true" : "false");
+    });
+  }
+  function openZoneModal(label) {
+    renderZoneTabs(label);
+    showZoneContent(label);
+    document.getElementById("zoneModalOverlay").hidden = false;
+  }
+  function closeZoneModal() {
+    document.getElementById("zoneModalOverlay").hidden = true;
+  }
+  // Capture phase: must intercept before a history row's own click
+  // listener (selectSet) fires during the bubble phase.
+  document.getElementById("appView").addEventListener("click", function (e) {
+    var link = e.target.closest(".zone-link");
+    if (!link) return;
+    e.stopPropagation();
+    openZoneModal(link.dataset.zone);
+  }, true);
+  document.getElementById("zoneModalClose").addEventListener("click", closeZoneModal);
+  document.getElementById("zoneModalOverlay").addEventListener("click", function (e) {
+    if (e.target.id === "zoneModalOverlay") closeZoneModal();
+  });
+
+  /* ---------------- enlarge-chart modal ---------------- */
+  var CHART_TYPES = ["velocity", "path", "drift"];
+  var currentModalChart = null;
+  var modalSelectedRep = null; // null = all reps overlaid; a number = that one rep only
+  function currentSetSim() {
+    var ex = EXERCISES[state.ex];
+    var idx = clamp(state.selected[state.ex], 0, ex.history.length - 1);
+    return { ex: ex, sim: simulateSet(ex.history[idx].weight, ex) };
+  }
+  function renderRepPills(container, repsCount, selectedIdx, onSelect) {
+    container.innerHTML = "";
+    var allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "rep-pill";
+    allBtn.textContent = "All reps";
+    allBtn.setAttribute("aria-pressed", selectedIdx === null ? "true" : "false");
+    allBtn.addEventListener("click", function () { onSelect(null); });
+    container.appendChild(allBtn);
+    for (var i = 0; i < repsCount; i++) {
+      (function (idx) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "rep-pill";
+        b.textContent = "Rep " + (idx + 1);
+        b.setAttribute("aria-pressed", selectedIdx === idx ? "true" : "false");
+        b.addEventListener("click", function () { onSelect(idx); });
+        container.appendChild(b);
+      })(i);
+    }
+  }
+  function updateModalRepArrows(repsCount) {
+    document.getElementById("modalRepPrev").disabled = modalSelectedRep === null;
+    document.getElementById("modalRepNext").disabled = modalSelectedRep !== null && modalSelectedRep >= repsCount - 1;
+  }
+  function stepModalRep(dir) {
+    var repsCount = currentSetSim().sim.reps;
+    var cur = modalSelectedRep === null ? -1 : modalSelectedRep;
+    var next = clamp(cur + dir, -1, repsCount - 1);
+    modalSelectedRep = next === -1 ? null : next;
+    openChartModal(currentModalChart);
+  }
+  function openChartModal(type) {
+    var isFresh = type !== currentModalChart;
+    if (isFresh) modalSelectedRep = null;
+    currentModalChart = type;
+    var ctx = currentSetSim();
+    var ex = ctx.ex, sim = ctx.sim;
+    if (modalSelectedRep !== null) modalSelectedRep = clamp(modalSelectedRep, 0, sim.reps - 1);
+
+    var title = document.getElementById("chartModalTitle");
+    var legendWrap = document.getElementById("chartModalLegend");
+    var pillsWrap = document.getElementById("chartModalPills");
+    var twoLegend = document.getElementById("chartModalTwoLegend");
+    var caption = document.getElementById("chartModalCaption");
+
+    renderRepPills(pillsWrap, sim.reps, modalSelectedRep, function (idx) {
+      modalSelectedRep = idx;
+      openChartModal(type);
+    });
+    updateModalRepArrows(sim.reps);
+
+    var svg = document.getElementById("chartModalSvg");
+
+    if (type === "velocity") {
+      title.textContent = "Bar speed by lift cycle";
+      legendWrap.hidden = modalSelectedRep !== null;
+      twoLegend.hidden = true;
+      caption.hidden = false;
+      caption.textContent = modalSelectedRep === null
+        ? "Every rep in the selected set, aligned on one lift cycle instead of time — the fade tracks fatigue rep to rep."
+        : "Rep " + (modalSelectedRep + 1) + " of " + sim.reps + ", aligned on one lift cycle.";
+      renderVelocityChart(ex, sim, { svg: "chartModalSvg", legend: "chartModalLegend" }, modalSelectedRep);
+    } else if (type === "path") {
+      title.textContent = "Bar path — left vs right";
+      legendWrap.hidden = true;
+      twoLegend.hidden = false;
+      caption.hidden = true;
+      drawPathCurves(svg, ex, sim, modalSelectedRep);
+    } else if (type === "drift") {
+      title.textContent = "Bar path — front vs back";
+      legendWrap.hidden = modalSelectedRep !== null;
+      twoLegend.hidden = true;
+      caption.hidden = false;
+      caption.textContent = modalSelectedRep === null
+        ? ex.driftCaption
+        : ex.driftCaption + " Showing rep " + (modalSelectedRep + 1) + " only.";
+      renderDriftChart(ex, sim, { svg: "chartModalSvg", legend: "chartModalLegend" }, modalSelectedRep);
+    }
+    document.getElementById("chartModalOverlay").hidden = false;
+  }
+  function closeChartModal() {
+    document.getElementById("chartModalOverlay").hidden = true;
+    currentModalChart = null;
+    modalSelectedRep = null;
+  }
+  function stepChartType(dir) {
+    var idx = CHART_TYPES.indexOf(currentModalChart);
+    var next = (idx + dir + CHART_TYPES.length) % CHART_TYPES.length;
+    openChartModal(CHART_TYPES[next]);
+  }
+  document.querySelectorAll(".chart-visual").forEach(function (el) {
+    el.addEventListener("click", function () { openChartModal(el.dataset.chart); });
+    el.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChartModal(el.dataset.chart); }
+    });
+  });
+  document.getElementById("chartModalClose").addEventListener("click", closeChartModal);
+  document.getElementById("chartModalOverlay").addEventListener("click", function (e) {
+    if (e.target.id === "chartModalOverlay") closeChartModal();
+  });
+  document.getElementById("modalRepPrev").addEventListener("click", function () { stepModalRep(-1); });
+  document.getElementById("modalRepNext").addEventListener("click", function () { stepModalRep(1); });
+  document.getElementById("chartTypePrev").addEventListener("click", function () { stepChartType(-1); });
+  document.getElementById("chartTypeNext").addEventListener("click", function () { stepChartType(1); });
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    if (!document.getElementById("chartModalOverlay").hidden) closeChartModal();
+    else if (!document.getElementById("zoneModalOverlay").hidden) closeZoneModal();
+  });
+
+  /* ---------------- light / dark theme toggle ---------------- */
+  var THEME_KEY = "vikt-theme";
+  function systemPrefersDark() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function effectiveIsDark() {
+    var explicit = document.documentElement.getAttribute("data-theme");
+    return explicit ? explicit === "dark" : systemPrefersDark();
+  }
+  function updateToggleIcons() {
+    // Note: the `hidden` IDL property/attribute is unreliable on inline SVG
+    // elements in some engines, so visibility is toggled via inline style
+    // instead of .hidden.
+    var dark = effectiveIsDark();
+    document.querySelectorAll(".theme-toggle").forEach(function (btn) {
+      btn.querySelector(".icon-sun").style.display = dark ? "none" : "";
+      btn.querySelector(".icon-moon").style.display = dark ? "" : "none";
+      btn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+    });
+  }
+  function applyTheme(theme) {
+    if (theme === "dark" || theme === "light") {
+      document.documentElement.setAttribute("data-theme", theme);
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    try { localStorage.setItem(THEME_KEY, theme || ""); } catch (e) { /* private browsing, etc. */ }
+    updateToggleIcons();
+  }
+  (function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
+    applyTheme(saved === "dark" || saved === "light" ? saved : null);
+    if (window.matchMedia) {
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+        var explicit = null;
+        try { explicit = localStorage.getItem(THEME_KEY); } catch (e) { /* ignore */ }
+        if (!explicit) updateToggleIcons();
+      });
+    }
+  })();
+  document.querySelectorAll(".theme-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () { applyTheme(effectiveIsDark() ? "light" : "dark"); });
+  });
+
+  /* ---------------- raw session preview (real Supabase fetch) ---------------- */
+  // Temporary signed link into the "raw-sessions" storage bucket — this one
+  // expires about a week after it was issued (Sep 20 2026). Once it stops
+  // working, swap in a fresh signed URL, or better, a permanent public URL,
+  // so this stops needing to be replaced by hand.
+  var RAW_SESSION_URL = "https://amxrrodzdvizndchfeqy.supabase.co/storage/v1/object/sign/raw-sessions/00000000-0000-0000-0000-000000000001/00000000-0000-0000-0000-000000000002.json?token=eyJraWQiOiI5MTZmY2Y1Yi1kOTNlLTRkMzEtYTU0Yi04NzFkMWYwYzA4YjciLCJhbGciOiJIUzUxMiJ9.eyJ1cmwiOiJyYXctc2Vzc2lvbnMvMDAwMDAwMDAtMDAwMC0wMDAwLTAwMDAtMDAwMDAwMDAwMDAxLzAwMDAwMDAwLTAwMDAtMDAwMC0wMDAwLTAwMDAwMDAwMDAwMi5qc29uIiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4OTg4MzYwOSwiZXhwIjoxNzkwNDg4NDA5fQ.7Z9bo-s3wwvZ7ljObx-TBb5ggwHeDFOZjMBN7AtVgIvwU15NfYxOGb9PyoH_l02seNRkR1gBron-56ots_J7RA";
+
+  function drawRawSessionChart(samples) {
+    var svg = document.getElementById("rawChart");
+    if (!svg) return;
+    svg.innerHTML = "";
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+    var bySensor = { left: [], right: [] };
+    samples.forEach(function (s) {
+      if (typeof s.vVert !== "number") return;
+      if (s.sensor !== "left" && s.sensor !== "right") return;
+      bySensor[s.sensor].push({ t: s.t, v: s.vVert });
+    });
+    bySensor.left.sort(function (a, b) { return a.t - b.t; });
+    bySensor.right.sort(function (a, b) { return a.t - b.t; });
+
+    var allPts = bySensor.left.concat(bySensor.right);
+    if (allPts.length === 0) {
+      var msg = svgEl("text", { x: W / 2, y: H / 2, "text-anchor": "middle", class: "mono", "font-size": 11, fill: "var(--muted)" });
+      msg.textContent = "No velocity samples found in this file.";
+      svg.appendChild(msg);
+      return;
+    }
+    var allT = allPts.map(function (p) { return p.t; });
+    var t0 = Math.min.apply(null, allT);
+    var t1 = Math.max.apply(null, allT);
+    var maxAbsV = Math.max.apply(null, allPts.map(function (p) { return Math.abs(p.v); }));
+    var vBound = niceAbsMax(maxAbsV, 0.2);
+
+    function xT(t) { return M.l + ((t - t0) / (t1 - t0)) * (W - M.l - M.r); }
+    var yS = makeYScaleRange(-vBound, vBound);
+
+    var yTicks = [-1, -0.5, 0, 0.5, 1].map(function (f) { return { v: +(vBound * f).toFixed(2), y: yS(vBound * f) }; });
+    yTicks.forEach(function (tk) {
+      svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: tk.y, y2: tk.y, stroke: "var(--chart-grid)", "stroke-width": 1 }));
+      var lbl = svgEl("text", { x: M.l - 10, y: tk.y + 3, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+      lbl.textContent = tk.v.toFixed(2);
+      svg.appendChild(lbl);
+    });
+    svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b, stroke: "var(--rule)", "stroke-width": 1 }));
+    svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: yS(0), y2: yS(0), stroke: "var(--muted)", "stroke-width": 1.2 }));
+
+    var tStart = svgEl("text", { x: M.l, y: H - 12, "text-anchor": "start", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    tStart.textContent = "0s";
+    svg.appendChild(tStart);
+    var tEnd = svgEl("text", { x: W - M.r, y: H - 12, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    tEnd.textContent = (t1 - t0).toFixed(0) + "s";
+    svg.appendChild(tEnd);
+
+    function drawSeries(pts, color) {
+      if (!pts.length) return;
+      var d = pts.map(function (p, i) {
+        return (i === 0 ? "M" : "L") + xT(p.t).toFixed(1) + "," + yS(p.v).toFixed(1);
+      }).join(" ");
+      svg.appendChild(svgEl("path", { d: d, fill: "none", stroke: color, "stroke-width": 1.3, "stroke-linecap": "round", opacity: 0.85 }));
+    }
+    drawSeries(bySensor.left, "var(--chart-left)");
+    drawSeries(bySensor.right, "var(--chart-right)");
+
+    var yt = svgEl("text", { x: W - M.r, y: M.t + 4, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    yt.textContent = "m/s vertical";
+    svg.appendChild(yt);
+  }
+
+  function loadRawSession() {
+    var status = document.getElementById("rawStatus");
+    var btn = document.getElementById("loadRawBtn");
+    if (!status || !btn) return;
+    status.textContent = "Loading from Supabase…";
+    btn.disabled = true;
+    fetch(RAW_SESSION_URL)
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        drawRawSessionChart(data);
+        status.textContent = data.length + " raw samples loaded live from Supabase Storage (unprocessed session).";
+      })
+      .catch(function (err) {
+        status.textContent = "Couldn't load the session (" + err.message + "). The signed link may have expired, or the bucket may not be reachable from here yet.";
+      })
+      .then(function () { btn.disabled = false; });
+  }
+
+  var loadRawBtn = document.getElementById("loadRawBtn");
+  if (loadRawBtn) loadRawBtn.addEventListener("click", loadRawSession);
+
+  /* ---------------- accounts: login / signup / team invites ---------------- */
+  // Same project as the raw-session fetch above. The anon key is meant to be
+  // public (see the chat where this was explained) — paste your project's
+  // "anon public" key from Settings -> API. Access is enforced by the Row
+  // Level Security policies set up in Supabase, not by keeping this secret.
+  var SUPABASE_URL = "https://amxrrodzdvizndchfeqy.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFteHJyb2R6ZHZpem5kY2hmZXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MzY2MjgsImV4cCI6MjEwNTExMjYyOH0.DK_3jMp83K1DQKW6NVaSK77UNYBtXwfamjkZ3svewO4";
+
+  var sb = (window.supabase && SUPABASE_ANON_KEY.indexOf("PASTE_") !== 0)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  var authMode = "login"; // "login" | "signup"
+  var pendingInviteId = null;
+  var currentTeam = null; // { team_id, role, teamName }
+
+  (function readInviteFromUrl() {
+    var params = new URLSearchParams(window.location.search);
+    var inv = params.get("invite");
+    if (!inv) return;
+    pendingInviteId = inv;
+  })();
+
+  function authEl(id) { return document.getElementById(id); }
+
+  function setAuthStatus(msg) { var s = authEl("authStatus"); if (s) s.textContent = msg || ""; }
+
+  function openAuthModal() {
+    var overlay = authEl("authModalOverlay");
+    if (!overlay) return;
+    overlay.hidden = false;
+    if (!sb) {
+      setAuthStatus("Not connected to Supabase yet — the anon key still needs to be filled in (see the code comment near SUPABASE_ANON_KEY).");
+    } else if (pendingInviteId) {
+      showInvitePreview();
+    }
+  }
+  function closeAuthModal() { var overlay = authEl("authModalOverlay"); if (overlay) overlay.hidden = true; }
+
+  function showInvitePreview() {
+    if (!sb || !pendingInviteId) return;
+    sb.from("vikt_team_invites").select("role, vikt_teams(name)").eq("id", pendingInviteId).single()
+      .then(function (res) {
+        var note = authEl("authInviteNote");
+        if (!note) return;
+        if (res.error || !res.data) {
+          note.hidden = true;
+          return;
+        }
+        note.hidden = false;
+        note.textContent = "You've been invited to join " + res.data.vikt_teams.name + " as a " + res.data.role + ". Sign up or log in to accept.";
+      })
+      .catch(function () { /* ignore preview errors, invite is still redeemed on login/signup */ });
+  }
+
+  function setAuthMode(mode) {
+    authMode = mode;
+    authEl("authModalTitle").textContent = mode === "login" ? "Log in" : "Sign up";
+    authEl("authSubmitBtn").textContent = mode === "login" ? "Log in" : "Sign up";
+    authEl("authToggleText").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
+    authEl("authToggleMode").textContent = mode === "login" ? "Sign up" : "Log in";
+    setAuthStatus("");
+  }
+
+  function showLoggedIn(user) {
+    authEl("authForm").hidden = true;
+    var panel = authEl("loggedInPanel");
+    panel.hidden = false;
+    authEl("loggedInStatus").textContent = "Logged in as " + user.email + (currentTeam ? " · " + currentTeam.teamName + " · " + currentTeam.role : " · no team yet");
+    var adminPanel = authEl("adminInvitePanel");
+    adminPanel.hidden = !(currentTeam && (currentTeam.role === "admin" || currentTeam.role === "coach"));
+    updateTeamBadge();
+  }
+
+  function updateTeamBadge() {
+    var badge = authEl("teamBadge");
+    if (!badge) return;
+    badge.textContent = currentTeam ? currentTeam.teamName : "No team assigned";
+  }
+
+  function loadMembership(user) {
+    return sb.from("vikt_team_members").select("team_id, role, vikt_teams(name)").eq("user_id", user.id).limit(1).maybeSingle()
+      .then(function (res) {
+        if (res.error) {
+          // Surfaced so a "no team yet" caused by a query/permissions problem
+          // is visible instead of silently looking like "just no membership".
+          console.error("loadMembership error:", res.error);
+        }
+        if (res.data) {
+          currentTeam = { team_id: res.data.team_id, role: res.data.role, teamName: res.data.vikt_teams.name };
+        } else {
+          currentTeam = null;
+        }
+        showLoggedIn(user);
+      });
+  }
+
+  function onAuthed(user) {
+    var goToDemo = function () {
+      closeAuthModal();
+      openDemo();
+    };
+    var afterMembership = function () {
+      if (pendingInviteId) {
+        sb.rpc("vikt_redeem_invite", { invite_id: pendingInviteId }).then(function (res) {
+          pendingInviteId = null;
+          if (!res.error) {
+            // clean the ?invite= param out of the address bar
+            var url = new URL(window.location.href);
+            url.searchParams.delete("invite");
+            window.history.replaceState({}, "", url);
+          }
+          loadMembership(user).then(goToDemo);
+        });
+      } else {
+        loadMembership(user).then(goToDemo);
+      }
+    };
+    afterMembership();
+  }
+
+  authEl("authToggleMode") && authEl("authToggleMode").addEventListener("click", function () {
+    setAuthMode(authMode === "login" ? "signup" : "login");
+  });
+
+  var authFormEl = authEl("authForm");
+  if (authFormEl) {
+    authFormEl.addEventListener("submit", function (e) {
+      e.preventDefault();
+      if (!sb) { setAuthStatus("Not connected to Supabase yet."); return; }
+      var email = authEl("authEmail").value.trim();
+      var password = authEl("authPassword").value;
+      setAuthStatus(authMode === "login" ? "Logging in…" : "Signing up…");
+      var call = authMode === "login"
+        ? sb.auth.signInWithPassword({ email: email, password: password })
+        : sb.auth.signUp({ email: email, password: password });
+      call.then(function (res) {
+        if (res.error) { setAuthStatus(res.error.message); return; }
+        if (!res.data.user) { setAuthStatus("Check your email to confirm your account, then log in."); return; }
+        onAuthed(res.data.user);
+      });
+    });
+  }
+
+  var goToDemoBtnEl = authEl("goToDemoBtn");
+  if (goToDemoBtnEl) {
+    goToDemoBtnEl.addEventListener("click", function () {
+      closeAuthModal();
+      openDemo();
+    });
+  }
+
+  var logoutBtnEl = authEl("logoutBtn");
+  if (logoutBtnEl) {
+    logoutBtnEl.addEventListener("click", function () {
+      sb.auth.signOut().then(function () {
+        currentTeam = null;
+        updateTeamBadge();
+        authEl("loggedInPanel").hidden = true;
+        authEl("authForm").hidden = false;
+        authEl("authEmail").value = "";
+        authEl("authPassword").value = "";
+        setAuthMode("login");
+      });
+    });
+  }
+
+  var createInviteBtnEl = authEl("createInviteBtn");
+  if (createInviteBtnEl) {
+    createInviteBtnEl.addEventListener("click", function () {
+      if (!currentTeam) return;
+      var role = authEl("inviteRoleSelect").value;
+      authEl("inviteStatus").textContent = "Creating link…";
+      sb.from("vikt_team_invites").insert({ team_id: currentTeam.team_id, role: role }).select().single()
+        .then(function (res) {
+          if (res.error) { authEl("inviteStatus").textContent = res.error.message; return; }
+          var link = window.location.origin + window.location.pathname + "?invite=" + res.data.id;
+          authEl("inviteLinkRow").hidden = false;
+          authEl("inviteLinkOut").value = link;
+          authEl("inviteStatus").textContent = "Share this link any way you like, email, text, chat. Anyone who opens it and signs up (or logs in) joins your team as a " + role + ".";
+        });
+    });
+  }
+  var copyInviteBtnEl = authEl("copyInviteBtn");
+  if (copyInviteBtnEl) {
+    copyInviteBtnEl.addEventListener("click", function () {
+      var input = authEl("inviteLinkOut");
+      input.select();
+      try { document.execCommand("copy"); authEl("inviteStatus").textContent = "Copied."; } catch (e) { /* clipboard not available */ }
+    });
+  }
+
+  document.querySelectorAll(".open-auth-btn").forEach(function (b) { b.addEventListener("click", openAuthModal); });
+  var authModalCloseEl = authEl("authModalClose");
+  if (authModalCloseEl) authModalCloseEl.addEventListener("click", closeAuthModal);
+  var authModalOverlayEl = authEl("authModalOverlay");
+  if (authModalOverlayEl) {
+    authModalOverlayEl.addEventListener("click", function (e) { if (e.target.id === "authModalOverlay") closeAuthModal(); });
+  }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && authModalOverlayEl && !authModalOverlayEl.hidden) closeAuthModal();
+  });
+
+  // If already logged in from a previous visit (Supabase keeps the session
+  // in the browser), pick that session back up automatically. Otherwise, if
+  // this visit came from an invite link (?invite=...), pop the auth modal
+  // open right away in signup mode so the invite is actually visible instead
+  // of silently waiting for the visitor to click "Log in" on their own.
+  if (sb) {
+    sb.auth.getSession().then(function (res) {
+      if (res.data && res.data.session) {
+        onAuthed(res.data.session.user);
+      } else if (pendingInviteId) {
+        setAuthMode("signup");
+        openAuthModal();
+      }
+    });
+  }
+
+})();
+</script>
+</body></html>
