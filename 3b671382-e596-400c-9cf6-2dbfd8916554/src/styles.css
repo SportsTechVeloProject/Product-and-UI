@@ -1,0 +1,154 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * VelocityLab design system — fluorescent lab instrument.
+ * Warm paper panels, near-black ink, fluorescent orange + teal accents.
+ * All colors in oklch, all tokens semantic.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --radius-panel: 28px;
+
+  --font-sans: var(--font-display-family);
+  --font-mono: var(--font-mono-family);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Instrument palette */
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-panel: var(--panel);
+  --color-signal: var(--signal);
+  --color-steady: var(--steady);
+  --color-line: var(--line);
+  --color-mut: var(--mut);
+}
+
+:root {
+  --radius: 0.75rem;
+  --font-display-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono-family: "JetBrains Mono", ui-monospace, monospace;
+
+  --ink: oklch(0.243 0.007 285);
+  --ink-foreground: oklch(0.983 0.004 95);
+  --panel: oklch(0.955 0.008 88);
+  --signal: oklch(0.662 0.223 33.5);
+  --steady: oklch(0.668 0.117 186);
+  --line: oklch(0.893 0.014 90);
+  --mut: oklch(0.52 0.02 95);
+
+  --background: var(--panel);
+  --foreground: var(--ink);
+  --card: oklch(0.983 0.004 95);
+  --card-foreground: var(--ink);
+  --popover: oklch(0.983 0.004 95);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: oklch(0.983 0.004 95);
+  --secondary: var(--panel);
+  --secondary-foreground: var(--ink);
+  --muted: var(--panel);
+  --muted-foreground: var(--mut);
+  --accent: var(--signal);
+  --accent-foreground: oklch(0.983 0.004 95);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.983 0.004 95);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--signal);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+  }
+}
+
+@utility panel-ring {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--ink) 6%, transparent);
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
+}
+
+@utility pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes rise-bar {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@utility rise-bar {
+  transform-origin: bottom;
+  animation: rise-bar 0.7s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@keyframes plate-load {
+  from {
+    transform: translateX(var(--slide, 16px)) scaleY(0.5);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+  }
+}
+
+@utility plate-load {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: plate-load 0.45s cubic-bezier(0.34, 1.3, 0.4, 1) both;
+}
