@@ -722,10 +722,148 @@
   table.history-table tr:last-child td { border-bottom: none; }
   table.history-table td.num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
 
+  /* ---- training plans ---- */
+  #exerciseView, #plansView { display: flex; flex-direction: column; gap: 40px; }
+  #exerciseView[hidden], #plansView[hidden] { display: none; }
+
+  .plan-intake { display: grid; grid-template-columns: minmax(260px, 0.8fr) 1.2fr; gap: 24px; align-items: stretch; }
+  .plan-drop {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    padding: 28px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .plan-drop:hover, .plan-drop:focus-visible { border-color: var(--accent); outline: none; }
+  .plan-drop.is-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .plan-drop-title { font-weight: 600; font-size: 0.95rem; margin: 0; }
+  .plan-drop-sub { font-size: 0.82rem; color: var(--muted); margin: 8px 0 0; }
+
+  .plan-paste { display: flex; flex-direction: column; gap: 10px; }
+  .plan-paste label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .plan-paste textarea {
+    min-height: 190px;
+    resize: vertical;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+  .plan-paste textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .plan-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .plan-actions .btn-ghost { margin-left: 0; }
+
+  .plan-format details {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    padding: 14px 20px;
+  }
+  .plan-format summary { cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+  .plan-format-body { padding-top: 12px; }
+  .plan-format-body p { font-size: 0.9rem; line-height: 1.65; margin: 0 0 14px; }
+  .plan-format-note { color: var(--muted); }
+  .plan-format-note strong { color: var(--fg); }
+  table.plan-format-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  table.plan-format-table th, table.plan-format-table td {
+    text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 0.87rem;
+  }
+  table.plan-format-table th {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted); font-weight: 500;
+  }
+  table.plan-format-table tr:last-child td { border-bottom: none; }
+
+  .plan-output .head-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .plan-output h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; }
+  .muted-small { font-size: 0.8rem; color: var(--muted); }
+
+  .plan-week { margin-bottom: 28px; }
+  .plan-week-head {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .plan-days { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; }
+  .plan-day {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px 18px;
+  }
+  .plan-day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+  .plan-day-title { font-weight: 600; font-size: 0.95rem; }
+  .plan-day-count { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--muted); }
+
+  .plan-item { border-top: 1px solid var(--border); padding: 11px 0; }
+  .plan-item:first-of-type { border-top: none; padding-top: 2px; }
+  .plan-item-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .plan-item-name { font-weight: 600; font-size: 0.92rem; }
+  button.plan-item-name {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: 'IBM Plex Sans', sans-serif; color: var(--accent); text-align: left;
+  }
+  button.plan-item-name:hover { text-decoration: underline; }
+  .plan-item-prescription {
+    font-family: 'IBM Plex Mono', monospace;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .plan-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.64rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 2px 7px;
+    border-radius: 20px;
+  }
+  .plan-tag.sensor { border-color: var(--accent); color: var(--accent); }
+  .plan-tag.tempo { border-color: var(--zone2); color: var(--zone2); }
+  .plan-item-tempo, .plan-item-note { font-size: 0.8rem; color: var(--muted); margin: 5px 0 0; }
+  .plan-item-note { font-style: italic; }
+
+  .plan-unparsed {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--zone2);
+    border-radius: 4px;
+    background: var(--surface);
+    padding: 14px 20px;
+  }
+  .plan-unparsed h4 { font-size: 0.8rem; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; margin: 0 0 8px; }
+  .plan-unparsed ul { margin: 0; padding-left: 18px; }
+  .plan-unparsed li { font-size: 0.85rem; line-height: 1.7; }
+  .plan-unparsed li .mono { color: var(--fg); }
+  .plan-unparsed li span.why { color: var(--muted); }
+
   @media (max-width: 760px) {
     .charts-grid { grid-template-columns: 1fr; }
     .app-hero { flex-direction: column; }
     .log-form { width: 100%; }
+    .plan-intake { grid-template-columns: 1fr; }
+    .plan-days { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -964,6 +1102,7 @@
         <button class="apptab" data-ex="squat" role="tab" type="button">Squat</button>
         <button class="apptab" data-ex="bench" role="tab" type="button">Bench Press</button>
         <button class="apptab" data-ex="deadlift" role="tab" type="button">Deadlift</button>
+        <button class="apptab" data-view="plans" role="tab" type="button">Plans</button>
       </nav>
       <span class="demo-badge" id="teamBadge">No team assigned</span>
       <span class="demo-badge">Demo · fictional data</span>
@@ -975,6 +1114,8 @@
   </header>
 
   <div class="wrap app-body">
+
+   <div id="exerciseView">
 
     <section class="app-hero">
       <div>
@@ -1055,6 +1196,82 @@
         </table>
       </div>
     </section>
+
+   </div><!-- /exerciseView -->
+
+   <div id="plansView" hidden>
+
+    <section class="app-hero">
+      <div>
+        <p class="eyebrow">Training plans</p>
+        <h2>Drop a plan in, read it as a schedule</h2>
+        <p class="exit-link"><a href="#" id="exitDemo3">← Back to overview</a></p>
+      </div>
+      <div class="log-form">
+        <label for="planName">Plan name</label>
+        <div class="log-row">
+          <input type="text" id="planName" placeholder="e.g. Peaking block — 6 weeks">
+        </div>
+        <p class="log-note">Everything is parsed in your browser. Nothing is uploaded yet.</p>
+      </div>
+    </section>
+
+    <section class="plan-intake">
+      <div class="plan-drop" id="planDrop" tabindex="0" role="button" aria-label="Drop a plan file here, or click to choose a file">
+        <p class="plan-drop-title">Drop a <span class="mono">.txt</span>, <span class="mono">.md</span> or <span class="mono">.csv</span> plan here</p>
+        <p class="plan-drop-sub">…or click to browse, or just paste the text below.</p>
+        <input type="file" id="planFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" hidden>
+      </div>
+
+      <div class="plan-paste">
+        <label for="planText">Paste a plan</label>
+        <textarea id="planText" spellcheck="false" placeholder="Week 1&#10;Day 1 — Heavy&#10;Back Squat 5x3 @140kg @31X1&#10;Bench Press 4x5 @85kg&#10;Deadlift 3x2 @85% // belt on"></textarea>
+        <div class="plan-actions">
+          <button class="btn" type="button" id="planParseBtn">Read plan</button>
+          <button class="btn-ghost" type="button" id="planSampleBtn">Load example</button>
+          <button class="btn-ghost" type="button" id="planClearBtn">Clear</button>
+        </div>
+        <p class="log-note" id="planStatus">No plan loaded.</p>
+      </div>
+    </section>
+
+    <section class="plan-format">
+      <details id="planFormatHelp">
+        <summary>What format does the plan need to be in?</summary>
+        <div class="plan-format-body">
+          <p>Short answer: the format is forgiving. One exercise per line is the only hard rule. Everything else is optional and can be written in the order you like — the parser picks tokens out of the line and treats whatever is left as the exercise name.</p>
+          <table class="plan-format-table">
+            <thead><tr><th>You write</th><th>It reads as</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">Week 3</td><td>Starts a new week</td></tr>
+              <tr><td class="mono">Day 2 — Heavy</td><td>Starts a new day (also <span class="mono">Monday</span>, or any line ending in <span class="mono">:</span>)</td></tr>
+              <tr><td class="mono">5x3</td><td>5 sets of 3 reps (<span class="mono">5 x 3-5</span> and <span class="mono">3,3,2</span> work too)</td></tr>
+              <tr><td class="mono">@140kg</td><td>Absolute load (<span class="mono">315lb</span> converts)</td></tr>
+              <tr><td class="mono">@85%</td><td>Percentage of your estimated 1RM</td></tr>
+              <tr><td class="mono">@RPE8</td><td>Rate of perceived exertion</td></tr>
+              <tr><td class="mono">@31X1</td><td>Tempo — see below</td></tr>
+              <tr><td class="mono">// belt on</td><td>A note (brackets work too)</td></tr>
+            </tbody>
+          </table>
+          <p class="plan-format-note"><strong>Tempo</strong> uses the standard four-character notation: <span class="mono">eccentric · pause · concentric · pause</span>, in seconds, where <span class="mono">X</span> means "as fast as you can". So <span class="mono">33X0</span> is three seconds down, three seconds held in the bottom, explosive up, no pause at the top. For the deadlift the order flips to concentric-first, because the pull is the first thing that happens.</p>
+          <p class="plan-format-note">Anything the parser can't place is listed underneath the plan rather than silently dropped, so you can see exactly what it missed.</p>
+        </div>
+      </details>
+    </section>
+
+    <section class="plan-output" id="planOutput" hidden>
+      <div class="head-row">
+        <h3>Plan overview</h3>
+        <span class="mono muted-small" id="planSummary"></span>
+      </div>
+      <div id="planWeeks"></div>
+      <div class="plan-unparsed" id="planUnparsed" hidden>
+        <h4>Lines we couldn't read</h4>
+        <ul id="planUnparsedList"></ul>
+      </div>
+    </section>
+
+   </div><!-- /plansView -->
 
   </div>
 
@@ -1653,6 +1870,8 @@
   function renderExercise(exKey) {
     state.ex = exKey;
     var ex = EXERCISES[exKey];
+    document.getElementById("plansView").hidden = true;
+    document.getElementById("exerciseView").hidden = false;
     document.getElementById("exEyebrow").textContent = ex.name;
     document.getElementById("exHeading").textContent = "Est. 1RM " + ex.oneRM + " kg";
 
@@ -1693,8 +1912,19 @@
   });
 
   /* ---------------- exercise tabs ---------------- */
+  function showPlans() {
+    document.getElementById("exerciseView").hidden = true;
+    document.getElementById("plansView").hidden = false;
+    document.querySelectorAll(".apptab").forEach(function (b) {
+      b.setAttribute("aria-selected", b.dataset.view === "plans" ? "true" : "false");
+    });
+  }
+
   document.querySelectorAll(".apptab").forEach(function (b) {
-    b.addEventListener("click", function () { renderExercise(b.dataset.ex); });
+    b.addEventListener("click", function () {
+      if (b.dataset.view === "plans") showPlans();
+      else renderExercise(b.dataset.ex);
+    });
   });
 
   /* ---------------- open / close demo ---------------- */
@@ -1714,6 +1944,7 @@
   }
   document.getElementById("exitDemo").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
   document.getElementById("exitDemo2").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
+  document.getElementById("exitDemo3").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
 
   /* ---------------- zone info modal ---------------- */
   function renderZoneTabs(activeLabel) {
@@ -2023,6 +2254,486 @@
 
   var loadRawBtn = document.getElementById("loadRawBtn");
   if (loadRawBtn) loadRawBtn.addEventListener("click", loadRawSession);
+
+  /* ---------------- training plans: parse ---------------- */
+  // The plan text a coach actually writes is loose, so the parser is loose too:
+  // it pulls recognisable tokens out of a line in any order and treats whatever
+  // survives as the exercise name. Anything it can't place is surfaced, never dropped.
+
+  var PLAN_KEY = "vlo.plan.v1";
+
+  var LIFT_MATCHERS = [
+    { key: "bench",    re: /\bbench(\s*press)?\b|\bbp\b/i },
+    { key: "deadlift", re: /\bdead\s?lifts?\b|\bdls?\b|\brdls?\b|\bromanian\b/i },
+    { key: "squat",    re: /\bsquats?\b|\bsq\b/i }
+  ];
+
+  // Returns the sensor-tracked lift a written name refers to, and whether the
+  // name carries qualifiers ("pause squat") that make it a variant of that lift.
+  function matchLift(name) {
+    var bare = name.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    var core = bare.replace(/\b(back|barbell|comp|competition|flat|conventional|press|the)\b/g, " ")
+                   .replace(/\s+/g, " ").trim();
+    for (var i = 0; i < LIFT_MATCHERS.length; i++) {
+      if (LIFT_MATCHERS[i].re.test(bare)) {
+        var k = LIFT_MATCHERS[i].key;
+        return { key: k, variant: core !== k && core !== k + "s" };
+      }
+    }
+    return null;
+  }
+
+  function tempoChars(tok) {
+    if (!/^[0-9xX]{4}$/.test(tok)) return null;
+    return tok.toUpperCase().split("").map(function (c) { return c === "X" ? "X" : parseInt(c, 10); });
+  }
+
+  // Four-character tempo is written eccentric-first by convention. The deadlift
+  // starts from the floor, so for the pull the first phase is the concentric.
+  function describeTempo(t, liftKey) {
+    var labels = liftKey === "deadlift"
+      ? ["up", "held at lockout", "down", "reset on the floor"]
+      : ["down", "held in the bottom", "up", "held at the top"];
+    var out = [];
+    for (var i = 0; i < 4; i++) {
+      var v = t[i], isPause = (i === 1 || i === 3);
+      if (isPause) {
+        if (v !== 0 && v !== "X") out.push(v + "s " + labels[i]);
+      } else if (v === "X") {
+        out.push("explosive " + labels[i]);
+      } else if (v === 0) {
+        out.push("controlled " + labels[i]);
+      } else {
+        out.push(v + "s " + labels[i]);
+      }
+    }
+    return out.join(" · ");
+  }
+
+  function parseExerciseLine(raw) {
+    var item = {
+      raw: raw, name: "", lift: null, sets: null, reps: null, repsText: "",
+      load: null, tempo: null, note: "", warnings: []
+    };
+    var rest = " " + raw.replace(/^\s*[-*•]\s+/, "").trim() + " ";
+
+    function take(re, fn) {
+      var m = rest.match(re);
+      if (!m) return false;
+      rest = rest.slice(0, m.index) + " " + rest.slice(m.index + m[0].length);
+      fn(m);
+      return true;
+    }
+
+    // 1. trailing note
+    take(/\/\/\s*(.+?)\s*$/, function (m) { item.note = m[1]; });
+
+    // 2. tempo — always marked, so "@3010" can't be mistaken for a load
+    take(/\[([0-9xX]{4})\]/, function (m) { item.tempo = tempoChars(m[1]); });
+    if (!item.tempo) {
+      take(/(?:^|\s)(?:@\s*|tempo\s*:?\s*|t\s*:\s*)([0-9xX]{4})(?=\s|$)/i, function (m) {
+        item.tempo = tempoChars(m[1]);
+      });
+    }
+
+    // 3. load — percentage and RPE before any bare "@140", which is kilos
+    take(/(?:^|\s)@?\s*(\d{1,3}(?:\.\d+)?)\s*%/, function (m) {
+      item.load = { kind: "pct", value: parseFloat(m[1]) };
+    });
+    if (!item.load) {
+      take(/(?:^|\s)@?\s*rpe\s*:?\s*(\d{1,2}(?:\.\d+)?)/i, function (m) {
+        item.load = { kind: "rpe", value: parseFloat(m[1]) };
+      });
+    }
+    if (!item.load) {
+      take(/(?:^|\s)@?\s*(\d{1,4}(?:[.,]\d+)?)\s*(kgs?|kilos?|lbs?|pounds?)\b/i, function (m) {
+        var v = parseFloat(m[1].replace(",", "."));
+        if (/^(lb|pound)/i.test(m[2])) v = Math.round(v * 0.45359237 * 2) / 2;
+        item.load = { kind: "kg", value: v };
+      });
+    }
+    if (!item.load) {
+      take(/(?:^|\s)@\s*(\d{1,4}(?:[.,]\d+)?)(?=\s|$)/, function (m) {
+        item.load = { kind: "kg", value: parseFloat(m[1].replace(",", ".")) };
+      });
+    }
+
+    // 4. sets and reps
+    var gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?(?=\s|$)/i, function (m) {
+      item.sets = parseInt(m[1], 10);
+      item.reps = parseInt(m[2], 10);
+      item.repsText = m[3] ? m[2] + "–" + m[3] : m[2];
+    });
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*sets?\s*(?:of|x)?\s*(\d{1,2})(?=\s|$)/i, function (m) {
+        item.sets = parseInt(m[1], 10);
+        item.reps = parseInt(m[2], 10);
+        item.repsText = m[2];
+      });
+    }
+    if (!gotScheme) {
+      take(/(?:^|\s)(\d{1,2}(?:\s*,\s*\d{1,2})+)(?=\s|$)/, function (m) {
+        var list = m[1].split(",").map(function (n) { return parseInt(n.trim(), 10); });
+        item.sets = list.length;
+        item.reps = list[0];
+        item.repsText = list.join("/");
+      });
+    }
+
+    // 5. bracketed note, once tempo has had its chance at the brackets
+    if (!item.note) take(/\(([^)]*)\)/, function (m) { item.note = m[1]; });
+
+    item.name = rest.replace(/[\s,;:@-]+$/, "").replace(/^[\s,;:-]+/, "").replace(/\s+/g, " ").trim();
+    if (!item.name) { item.warnings.push("no exercise name"); return null; }
+    item.lift = matchLift(item.name);
+    return item;
+  }
+
+  function looksLikeCsv(lines) {
+    if (!lines.length) return false;
+    var head = lines[0].toLowerCase();
+    if (head.indexOf(",") < 0 && head.indexOf(";") < 0) return false;
+    var known = ["exercise", "lift", "movement", "sets", "reps", "load", "weight", "tempo", "week", "day"];
+    var hits = known.filter(function (k) { return head.indexOf(k) >= 0; });
+    return hits.length >= 2;
+  }
+
+  function splitCsvRow(line, sep) {
+    var out = [], cur = "", inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (c === sep && !inQ) { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out.map(function (s) { return s.trim(); });
+  }
+
+  function parseCsvPlan(lines) {
+    var sep = lines[0].indexOf(";") > lines[0].indexOf(",") ? ";" : ",";
+    var headers = splitCsvRow(lines[0], sep).map(function (h) { return h.toLowerCase(); });
+    function col(row, names) {
+      for (var i = 0; i < names.length; i++) {
+        var idx = headers.indexOf(names[i]);
+        if (idx >= 0 && row[idx]) return row[idx];
+      }
+      return "";
+    }
+    var weeks = [], unparsed = [];
+    for (var r = 1; r < lines.length; r++) {
+      if (!lines[r].trim()) continue;
+      var row = splitCsvRow(lines[r], sep);
+      var name = col(row, ["exercise", "lift", "movement"]);
+      if (!name) { unparsed.push({ line: lines[r], reason: "no exercise column value" }); continue; }
+      var parts = [name];
+      var sets = col(row, ["sets"]), reps = col(row, ["reps"]);
+      if (sets && reps) parts.push(sets + "x" + reps);
+      else if (reps) parts.push("1x" + reps);
+      var load = col(row, ["load", "weight", "intensity"]);
+      if (load) parts.push(/[%a-z]/i.test(load) ? load : load + "kg");
+      var tempo = col(row, ["tempo"]);
+      if (tempo) parts.push("[" + tempo + "]");
+      var note = col(row, ["notes", "note", "comment"]);
+      if (note) parts.push("// " + note);
+      var item = parseExerciseLine(parts.join(" "));
+      if (!item) { unparsed.push({ line: lines[r], reason: "could not read the row" }); continue; }
+      var wLabel = col(row, ["week"]) || "Plan";
+      if (/^\d+$/.test(wLabel)) wLabel = "Week " + wLabel;
+      var dLabel = col(row, ["day", "session"]) || "Session";
+      if (/^\d+$/.test(dLabel)) dLabel = "Day " + dLabel;
+      var week = weeks.filter(function (w) { return w.label === wLabel; })[0];
+      if (!week) { week = { label: wLabel, days: [] }; weeks.push(week); }
+      var day = week.days.filter(function (d) { return d.label === dLabel; })[0];
+      if (!day) { day = { label: dLabel, items: [] }; week.days.push(day); }
+      day.items.push(item);
+    }
+    return { weeks: weeks, unparsed: unparsed };
+  }
+
+  function parsePlan(text) {
+    var lines = text.replace(/\r\n?/g, "\n").split("\n");
+    var nonEmpty = lines.filter(function (l) { return l.trim(); });
+    if (looksLikeCsv(nonEmpty)) {
+      var csv = parseCsvPlan(nonEmpty);
+      return { title: "", weeks: csv.weeks, unparsed: csv.unparsed };
+    }
+
+    var plan = { title: "", weeks: [], unparsed: [] };
+    var week = null, day = null, sawAny = false;
+
+    function ensureWeek(label) { week = { label: label, days: [] }; plan.weeks.push(week); day = null; }
+    function ensureDay(label) {
+      if (!week) ensureWeek("Plan");
+      day = { label: label, items: [] };
+      week.days.push(day);
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      var t = lines[i].trim();
+      if (!t) { day = null; continue; }
+
+      var heading = t.match(/^(#{1,6})\s*(.+)$/);
+      var body = heading ? heading[2].trim() : t;
+
+      if (/^(week|wk|w)\s*[:#]?\s*\d+/i.test(body) || (heading && /week/i.test(body))) {
+        ensureWeek(body.replace(/[:\s]+$/, ""));
+        continue;
+      }
+      if (heading && !sawAny && !plan.title) { plan.title = body; continue; }
+      if (/^day\s*[:#]?\s*\d+/i.test(body) ||
+          /^(mon|tues?|wed(nes)?|thur?s?|fri|sat(ur)?|sun)(day)?\b/i.test(body) ||
+          heading ||
+          (/:$/.test(body) && !/\d\s*[x×]\s*\d/i.test(body))) {
+        ensureDay(body.replace(/[:\s]+$/, ""));
+        continue;
+      }
+
+      var item = parseExerciseLine(t);
+      if (!item) { plan.unparsed.push({ line: t, reason: "no exercise name left after reading the numbers" }); continue; }
+      if (item.sets === null && item.load === null && item.tempo === null) {
+        plan.unparsed.push({ line: t, reason: "no sets, load or tempo found — read as prose, not an exercise" });
+        continue;
+      }
+      if (!day) ensureDay(week ? "Session " + (week.days.length + 1) : "Session 1");
+      day.items.push(item);
+      sawAny = true;
+    }
+
+    plan.weeks = plan.weeks.filter(function (w) {
+      w.days = w.days.filter(function (d) { return d.items.length; });
+      return w.days.length;
+    });
+    return plan;
+  }
+
+  /* ---------------- training plans: render ---------------- */
+
+  function prescribedKg(item) {
+    if (!item.load) return null;
+    if (item.load.kind === "kg") return item.load.value;
+    if (item.load.kind === "pct" && item.lift) {
+      return Math.round(EXERCISES[item.lift.key].oneRM * item.load.value / 100 * 2) / 2;
+    }
+    return null;
+  }
+
+  function loadText(item) {
+    if (!item.load) return "";
+    if (item.load.kind === "kg") return item.load.value + " kg";
+    if (item.load.kind === "rpe") return "RPE " + item.load.value;
+    var kg = prescribedKg(item);
+    return item.load.value + "%" + (kg ? " (≈" + kg + " kg)" : "");
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function renderPlanItem(item) {
+    var wrap = el("div", "plan-item");
+    var top = el("div", "plan-item-top");
+
+    if (item.lift) {
+      var btn = el("button", "plan-item-name", item.name);
+      btn.type = "button";
+      btn.title = "Open the " + EXERCISES[item.lift.key].name + " sensor view";
+      btn.addEventListener("click", function () { renderExercise(item.lift.key); window.scrollTo(0, 0); });
+      top.appendChild(btn);
+      var tag = el("span", "plan-tag sensor", item.lift.variant ? EXERCISES[item.lift.key].name : "sensor");
+      top.appendChild(tag);
+    } else {
+      top.appendChild(el("span", "plan-item-name", item.name));
+    }
+
+    if (item.tempo) top.appendChild(el("span", "plan-tag tempo", "tempo"));
+
+    var bits = [];
+    if (item.sets) bits.push(item.sets + " × " + (item.repsText || item.reps));
+    var lt = loadText(item);
+    if (lt) bits.push(lt);
+    if (bits.length) top.appendChild(el("span", "plan-item-prescription", bits.join("  ·  ")));
+    wrap.appendChild(top);
+
+    if (item.tempo) {
+      wrap.appendChild(el("p", "plan-item-tempo",
+        describeTempo(item.tempo, item.lift && item.lift.key)));
+    }
+
+    // A prescribed load on a sensor-tracked lift has an expected bar speed,
+    // straight off the same load–velocity profile the live charts use.
+    var kg = prescribedKg(item);
+    if (item.lift && kg) {
+      var ex = EXERCISES[item.lift.key];
+      var sim = simulateSet(kg, ex);
+      wrap.appendChild(el("p", "plan-item-tempo",
+        "Target first-rep speed ≈ " + sim.v1.toFixed(2) + " m/s · " + zoneFor(ex, sim.v1) +
+        " · " + Math.round(sim.pct) + "% of est. 1RM"));
+    }
+
+    if (item.note) wrap.appendChild(el("p", "plan-item-note", item.note));
+    return wrap;
+  }
+
+  function renderPlan(plan) {
+    var out = document.getElementById("planOutput");
+    var host = document.getElementById("planWeeks");
+    host.textContent = "";
+
+    var days = 0, items = 0, tracked = 0, tempos = 0;
+    plan.weeks.forEach(function (w) {
+      var wrap = el("div", "plan-week");
+      wrap.appendChild(el("p", "plan-week-head", w.label));
+      var grid = el("div", "plan-days");
+      w.days.forEach(function (d) {
+        days++;
+        var card = el("div", "plan-day");
+        var head = el("div", "plan-day-head");
+        head.appendChild(el("span", "plan-day-title", d.label));
+        head.appendChild(el("span", "plan-day-count", d.items.length + (d.items.length === 1 ? " lift" : " lifts")));
+        card.appendChild(head);
+        d.items.forEach(function (it) {
+          items++;
+          if (it.lift) tracked++;
+          if (it.tempo) tempos++;
+          card.appendChild(renderPlanItem(it));
+        });
+        grid.appendChild(card);
+      });
+      wrap.appendChild(grid);
+      host.appendChild(wrap);
+    });
+
+    var summary = [
+      plan.weeks.length + (plan.weeks.length === 1 ? " week" : " weeks"),
+      days + (days === 1 ? " day" : " days"),
+      items + (items === 1 ? " exercise" : " exercises"),
+      tracked + " sensor-tracked"
+    ];
+    if (tempos) summary.push(tempos + " with tempo");
+    document.getElementById("planSummary").textContent = summary.join(" · ");
+
+    var unWrap = document.getElementById("planUnparsed");
+    var unList = document.getElementById("planUnparsedList");
+    unList.textContent = "";
+    plan.unparsed.forEach(function (u) {
+      var li = document.createElement("li");
+      li.appendChild(el("span", "mono", u.line));
+      li.appendChild(el("span", "why", " — " + u.reason));
+      unList.appendChild(li);
+    });
+    unWrap.hidden = plan.unparsed.length === 0;
+
+    out.hidden = items === 0 && plan.unparsed.length === 0;
+
+    var status = document.getElementById("planStatus");
+    if (!items && !plan.unparsed.length) status.textContent = "No plan loaded.";
+    else if (!items) status.textContent = "Nothing readable found — check the format notes above.";
+    else status.textContent = "Read " + items + " exercises" +
+      (plan.unparsed.length ? ", skipped " + plan.unparsed.length + " line(s)." : ".");
+  }
+
+  function runPlanParse(save) {
+    var text = document.getElementById("planText").value;
+    var plan = parsePlan(text);
+    var nameInput = document.getElementById("planName");
+    if (plan.title && !nameInput.value.trim()) nameInput.value = plan.title;
+    renderPlan(plan);
+    if (save) {
+      try {
+        localStorage.setItem(PLAN_KEY, JSON.stringify({ name: nameInput.value, text: text }));
+      } catch (e) { /* private mode or quota — the plan just doesn't persist */ }
+    }
+  }
+
+  var PLAN_SAMPLE = [
+    "# Peaking block",
+    "",
+    "Week 1",
+    "Day 1 — Heavy squat",
+    "Back Squat 5x3 @140kg @31X1",
+    "Pause Squat 3x2 @120kg @33X0 // three full seconds in the hole",
+    "Bench Press 4x5 @85kg",
+    "",
+    "Day 2 — Pull",
+    "Deadlift 3x2 @85% // belt on",
+    "Romanian Deadlift 3x8 @100kg",
+    "Barbell Row 4x8 @70kg",
+    "",
+    "Week 2",
+    "Day 1 — Heavy squat",
+    "Back Squat 5x3 @145kg @31X1",
+    "Bench Press 4x4 @87.5kg @RPE8",
+    "Chin-ups 4x8"
+  ].join("\n");
+
+  (function initPlans() {
+    var textEl = document.getElementById("planText");
+    var dropEl = document.getElementById("planDrop");
+    var fileEl = document.getElementById("planFile");
+
+    document.getElementById("planParseBtn").addEventListener("click", function () { runPlanParse(true); });
+
+    document.getElementById("planSampleBtn").addEventListener("click", function () {
+      textEl.value = PLAN_SAMPLE;
+      document.getElementById("planName").value = "";
+      runPlanParse(true);
+    });
+
+    document.getElementById("planClearBtn").addEventListener("click", function () {
+      textEl.value = "";
+      document.getElementById("planName").value = "";
+      try { localStorage.removeItem(PLAN_KEY); } catch (e) { /* nothing to clear */ }
+      runPlanParse(false);
+    });
+
+    var debounce;
+    textEl.addEventListener("input", function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () { runPlanParse(true); }, 400);
+    });
+    document.getElementById("planName").addEventListener("change", function () { runPlanParse(true); });
+
+    function readFile(file) {
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        textEl.value = String(reader.result);
+        var base = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+        if (base) document.getElementById("planName").value = base;
+        runPlanParse(true);
+      };
+      reader.readAsText(file);
+    }
+
+    dropEl.addEventListener("click", function () { fileEl.click(); });
+    dropEl.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileEl.click(); }
+    });
+    fileEl.addEventListener("change", function () { readFile(fileEl.files[0]); fileEl.value = ""; });
+
+    ["dragenter", "dragover"].forEach(function (evt) {
+      dropEl.addEventListener(evt, function (e) { e.preventDefault(); dropEl.classList.add("is-over"); });
+    });
+    ["dragleave", "drop"].forEach(function (evt) {
+      dropEl.addEventListener(evt, function (e) { e.preventDefault(); dropEl.classList.remove("is-over"); });
+    });
+    dropEl.addEventListener("drop", function (e) {
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) readFile(e.dataTransfer.files[0]);
+    });
+
+    try {
+      var saved = JSON.parse(localStorage.getItem(PLAN_KEY) || "null");
+      if (saved && saved.text) {
+        textEl.value = saved.text;
+        if (saved.name) document.getElementById("planName").value = saved.name;
+        runPlanParse(false);
+      }
+    } catch (e) { /* nothing saved, or unreadable — start empty */ }
+  })();
 
   /* ---------------- accounts: login / signup / team invites ---------------- */
   // Same project as the raw-session fetch above. The anon key is meant to be
