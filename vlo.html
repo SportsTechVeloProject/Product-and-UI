@@ -2669,22 +2669,42 @@
 
   var PLAN_KEY = "vlo.plan.v1";
 
+  // Folds a name down to plain ASCII so Icelandic and Swedish lift names match
+  // with the same patterns as English ones. Doing this up front also avoids \b
+  // behaving oddly around þ, ð and æ, which JavaScript treats as non-word
+  // characters — /\bþungt/ never matches "þungt" at the start of a line.
+  function fold(s) {
+    return String(s || "").toLowerCase()
+      .replace(/þ/g, "th").replace(/ð/g, "d").replace(/æ/g, "ae").replace(/ø/g, "o")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9 ]/g, " ")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  // Matched against the folded name, so e.g. "hnebeygj" covers Hnébeygja and
+  // the oblique Hnébeygju that shows up in "3 sett af hnébeygju".
   var LIFT_MATCHERS = [
-    { key: "bench",    re: /\bbench(\s*press)?\b|\bbp\b/i },
-    { key: "deadlift", re: /\bdead\s?lifts?\b|\bdls?\b|\brdls?\b|\bromanian\b/i },
-    { key: "squat",    re: /\bsquats?\b|\bsq\b/i }
+    // The plain forms include Icelandic case endings, so "3 sett af hnébeygju"
+    // is still the plain lift rather than looking like a variant of it.
+    { key: "bench", re: /\bbench\b|\bbp\b|bekkpress|bankpress/,
+      plain: ["bench", "bench press", "bekkpressa", "bekkpressu", "bankpress", "bankpressen"] },
+    { key: "deadlift", re: /\bdead ?lifts?\b|\bdls?\b|\brdls?\b|romanian|rettstodulyft|rettstada|marklyft/,
+      plain: ["deadlift", "dead lift", "rettstodulyfta", "rettstodulyftu", "rettstodulyftur",
+              "marklyft", "marklyftet"] },
+    { key: "squat", re: /\bsquats?\b|\bsq\b|hnebeygj|knaboj/,
+      plain: ["squat", "squats", "hnebeygja", "hnebeygju", "hnebeygjur", "knaboj", "knabojen"] }
   ];
 
+  var NEUTRAL_QUALIFIERS = /\b(back|barbell|comp|competition|flat|conventional|press|the|klassisk|klassisk[ta]?|keppni|stong|skivstang)\b/g;
+
   // Returns the sensor-tracked lift a written name refers to, and whether the
-  // name carries qualifiers ("pause squat") that make it a variant of that lift.
+  // name carries qualifiers ("pause squat", "framhnébeygja") making it a variant.
   function matchLift(name) {
-    var bare = name.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-    var core = bare.replace(/\b(back|barbell|comp|competition|flat|conventional|press|the)\b/g, " ")
-                   .replace(/\s+/g, " ").trim();
+    var bare = fold(name);
+    var core = bare.replace(NEUTRAL_QUALIFIERS, " ").replace(/\s+/g, " ").trim();
     for (var i = 0; i < LIFT_MATCHERS.length; i++) {
       if (LIFT_MATCHERS[i].re.test(bare)) {
-        var k = LIFT_MATCHERS[i].key;
-        return { key: k, variant: core !== k && core !== k + "s" };
+        return { key: LIFT_MATCHERS[i].key, variant: LIFT_MATCHERS[i].plain.indexOf(core) < 0 };
       }
     }
     return null;
@@ -2798,21 +2818,23 @@
 
   /* ---- tables: Word tables, Excel sheets and CSV all arrive as rows of cells ---- */
 
+  // Keys are compared folded, so these are written in plain ASCII: "aefing" is
+  // æfing, "thyngd" is þyngd, "alag" is álag, "ovning" is övning.
   var HEADER_ALIASES = {
-    exercise: ["exercise", "exercises", "lift", "lifts", "movement", "övning", "ovning"],
-    sets: ["sets", "set"],
-    reps: ["reps", "rep", "repetitions"],
-    load: ["load", "weight", "intensity", "kg", "vikt"],
-    tempo: ["tempo"],
-    notes: ["notes", "note", "comment", "comments", "kommentar"],
-    week: ["week", "wk", "vecka"],
-    day: ["day", "session", "pass", "dag"]
+    exercise: ["exercise", "exercises", "lift", "lifts", "movement", "aefing", "aefingar", "ovning", "ovningar"],
+    sets: ["sets", "set", "sett", "umferdir"],
+    reps: ["reps", "rep", "repetitions", "endurtekningar", "endurt", "repetitioner"],
+    load: ["load", "weight", "intensity", "kg", "thyngd", "alag", "vikt"],
+    tempo: ["tempo", "taktur"],
+    notes: ["notes", "note", "comment", "comments", "athugasemdir", "athugasemd", "minnispunktar", "kommentar"],
+    week: ["week", "wk", "vika", "vecka"],
+    day: ["day", "session", "pass", "dag", "dagur", "lota"]
   };
 
   function headerMap(cells) {
     var map = {};
     cells.forEach(function (raw, i) {
-      var c = String(raw || "").toLowerCase().trim();
+      var c = fold(raw);
       if (!c) return;
       Object.keys(HEADER_ALIASES).forEach(function (key) {
         if (map[key] === undefined && HEADER_ALIASES[key].indexOf(c) >= 0) map[key] = i;
@@ -2921,6 +2943,20 @@
     return lines;
   }
 
+  // English, Icelandic and Swedish headers, tested against the folded line so
+  // "Vika 3", "Þriðjudagur" and "Lördag" read the same as "Week 3" and "Tuesday".
+  function isWeekHeading(body) {
+    return /^(week|wk|w|vika|vecka|uke|uge)\s*[:#]?\s*\d+/.test(fold(body));
+  }
+
+  function isDayHeading(body) {
+    var f = fold(body);
+    if (/^(day|dagur|dag|pass|lota|session|aefing)\s*[:#]?\s*\d+/.test(f)) return true;
+    if (/^(mon|tue|wed|thu|fri|sat|sun)(day)?\b/.test(f)) return true;
+    if (/^(manudag|thridjudag|midvikudag|fimmtudag|fostudag|laugardag|sunnudag)/.test(f)) return true;
+    return /^(mandag|tisdag|onsdag|torsdag|fredag|lordag|sondag)/.test(f);
+  }
+
   function looksLikeCsv(lines) {
     if (!lines.length) return false;
     var head = lines[0].toLowerCase();
@@ -2973,15 +3009,12 @@
       // "##" and "###" are explicit week and day markers. Tables extracted from
       // Word and Excel emit them, so an arbitrary label like "Heavy" survives
       // the trip through this text form instead of looking like an exercise.
-      if (hashes === 2 || /^(week|wk|w)\s*[:#]?\s*\d+/i.test(body) || (hashes === 1 && /week/i.test(body))) {
+      if (hashes === 2 || isWeekHeading(body) || (hashes === 1 && /week|vika|vecka/i.test(body))) {
         ensureWeek(body.replace(/[:\s]+$/, ""));
         continue;
       }
       if (hashes === 1 && !sawAny && !plan.title) { plan.title = body; continue; }
-      if (/^day\s*[:#]?\s*\d+/i.test(body) ||
-          /^(mon|tues?|wed(nes)?|thur?s?|fri|sat(ur)?|sun)(day)?\b/i.test(body) ||
-          heading ||
-          (/:$/.test(body) && !/\d\s*[x×]\s*\d/i.test(body))) {
+      if (isDayHeading(body) || heading || (/:$/.test(body) && !/\d\s*[x×]\s*\d/i.test(body))) {
         ensureDay(body.replace(/[:\s]+$/, ""));
         continue;
       }
