@@ -2785,8 +2785,13 @@
       });
     }
 
-    // 4. sets and reps
-    var gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?(?=\s|$)/i, function (m) {
+    // 4. sets and reps. Time-based work is tried before the plain NxM form,
+    // otherwise "3x30sek" reads as thirty reps and loses the unit.
+    var gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,3})\s*(sek|sec|mín|min)\b/i, function (m) {
+      item.sets = parseInt(m[1], 10);
+      item.repsText = m[2] + " " + m[3].toLowerCase();
+    });
+    if (!gotScheme) gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?(?=\s|$)/i, function (m) {
       item.sets = parseInt(m[1], 10);
       item.reps = parseInt(m[2], 10);
       item.repsText = m[3] ? m[2] + "–" + m[3] : m[2];
@@ -2799,11 +2804,61 @@
       });
     }
     if (!gotScheme) {
-      take(/(?:^|\s)(\d{1,2}(?:\s*,\s*\d{1,2})+)(?=\s|$)/, function (m) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(failure|fail|max|amrap)\b/i, function (m) {
+        item.sets = parseInt(m[1], 10);
+        item.repsText = m[2].toLowerCase();
+      });
+    }
+    // A descending ladder like 12-10-8-6 is one set per number. Three numbers
+    // minimum, so a plain rep range such as 8-10 isn't mistaken for one.
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2}(?:\s*[-–]\s*\d{1,2}){2,})(?=\s|$)/, function (m) {
+        var list = m[1].split(/[-–]/).map(function (n) { return parseInt(n.trim(), 10); });
+        item.sets = list.length;
+        item.reps = list[0];
+        item.repsText = list.join("/");
+      });
+    }
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2}(?:\s*,\s*\d{1,2})+)(?=\s|$)/, function (m) {
         var list = m[1].split(",").map(function (n) { return parseInt(n.trim(), 10); });
         item.sets = list.length;
         item.reps = list[0];
         item.repsText = list.join("/");
+      });
+    }
+    // "10 rep max" and "5RM" are a single top set, not ten sets.
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*reps?\s*max\b/i, function (m) {
+        item.sets = 1;
+        item.reps = parseInt(m[1], 10);
+        item.repsText = m[1] + " rep max";
+      });
+    }
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*rm\b/i, function (m) {
+        item.sets = 1;
+        item.reps = parseInt(m[1], 10);
+        item.repsText = m[1] + "RM";
+      });
+    }
+    // Counts with no partner: "3 sett", "2 hringir", "10 reps".
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*(sett|sets?)\b/i, function (m) {
+        item.sets = parseInt(m[1], 10);
+      });
+    }
+    if (!gotScheme) {
+      gotScheme = take(/(?:^|\s)(\d{1,2})\s*(hringir|hringi|hringur|umferðir|rounds?)\b/i, function (m) {
+        item.sets = parseInt(m[1], 10);
+        item.repsText = "rounds";
+      });
+    }
+    if (!gotScheme) {
+      take(/(?:^|\s)(\d{1,3})\s*(reps?|endurtekningar)\b/i, function (m) {
+        item.sets = 1;
+        item.reps = parseInt(m[1], 10);
+        item.repsText = m[1];
       });
     }
 
@@ -2825,6 +2880,7 @@
     sets: ["sets", "set", "sett", "umferdir"],
     reps: ["reps", "rep", "repetitions", "endurtekningar", "endurt", "repetitioner"],
     load: ["load", "weight", "intensity", "kg", "thyngd", "alag", "vikt"],
+    rpe: ["rpe", "rir"],
     tempo: ["tempo", "taktur"],
     notes: ["notes", "note", "comment", "comments", "athugasemdir", "athugasemd", "minnispunktar", "kommentar"],
     week: ["week", "wk", "vika", "vecka"],
@@ -2854,6 +2910,59 @@
   }
 
   function cellText(row, i) { return i === undefined ? "" : String(row[i] === undefined ? "" : row[i]).trim(); }
+
+  // Templates use a dash to mean "not performed this week".
+  function cleanCell(v) {
+    var t = String(v || "").trim();
+    return (!t || /^[-–—]+$/.test(t)) ? "" : t;
+  }
+
+  // Typing a rep range like 8-10 into a General cell makes Excel store a date
+  // instead, so those columns come back as serial numbers. The month and day
+  // are the two numbers that were typed, which gives the range back.
+  function unmangleRange(value) {
+    var n = parseFloat(value);
+    if (!isFinite(n) || n % 1 !== 0 || n < 30000 || n > 60000) return null;
+    var d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+    return (d.getUTCMonth() + 1) + "-" + d.getUTCDate();
+  }
+
+  function rangeCell(row, i) {
+    var raw = cleanCell(cellText(row, i));
+    return unmangleRange(raw) || raw;
+  }
+
+  function prescriptionLine(row, m, name) {
+    var parts = [name];
+    var sets = cleanCell(cellText(row, m.sets));
+    var reps = rangeCell(row, m.reps);
+    if (sets && reps) parts.push(sets + "x" + reps);
+    else if (reps) parts.push("1x" + reps);
+    else if (sets) parts.push(sets + " sets");
+    var load = cleanCell(cellText(row, m.load));
+    if (load) parts.push(/[%a-z]/i.test(load) ? load : load + "kg");
+    var rpe = rangeCell(row, m.rpe);
+    if (rpe) parts.push("@RPE" + rpe);
+    var tempo = cleanCell(cellText(row, m.tempo));
+    if (tempo) parts.push("[" + tempo + "]");
+    var note = cleanCell(cellText(row, m.notes));
+    if (note) parts.push("// " + note);
+    return parts.length > 1 ? parts.join(" ") : "";
+  }
+
+  // "DAY 1 | SETS | REPS | WEIGHT | RPE | TEMPO | NOTES" — a header row whose
+  // first column is titled with the day rather than with "Exercise". Returns
+  // the exercise column index, or -1 when the row isn't one of these.
+  function dayBlockHeader(row) {
+    var first = -1;
+    for (var i = 0; i < row.length; i++) { if (cellText(row, i)) { first = i; break; } }
+    if (first < 0 || !isDayHeading(cellText(row, first))) return -1;
+    var m = headerMap(row), known = 0;
+    ["sets", "reps", "load", "rpe", "tempo", "notes"].forEach(function (k) {
+      if (m[k] !== undefined) known++;
+    });
+    return known >= 2 ? first : -1;
+  }
 
   function weekHeading(label) {
     var t = String(label || "").trim();
@@ -2888,18 +2997,154 @@
         var wk = cellText(row, m.week), dy = cellText(row, m.day);
         if (wk && wk !== lastWeek) { lines.push(weekHeading(wk)); lastWeek = wk; lastDay = null; }
         if (dy && dy !== lastDay) { lines.push(dayHeading(dy)); lastDay = dy; }
-        var parts = [name];
-        var sets = cellText(row, m.sets), reps = cellText(row, m.reps);
-        if (sets && reps) parts.push(sets + "x" + reps);
-        else if (reps) parts.push("1x" + reps);
-        var load = cellText(row, m.load);
-        if (load) parts.push(/[%a-z]/i.test(load) ? load : load + "kg");
-        var tempo = cellText(row, m.tempo);
-        if (tempo) parts.push("[" + tempo + "]");
-        var note = cellText(row, m.notes);
-        if (note) parts.push("// " + note);
-        lines.push(parts.join(" "));
+        lines.push(prescriptionLine(row, m, name) || name);
       }
+      return lines;
+    }
+
+    // A header row repeated once per day. Bought templates often run several
+    // weeks side by side, so one row can carry several of these — each owning
+    // the columns up to the next day title on that row.
+    var weekMarks = [];
+    rows.forEach(function (row, r) {
+      for (var i = 0; i < row.length; i++) {
+        var v = cellText(row, i);
+        if (v && isWeekHeading(v)) weekMarks.push({ row: r, col: i, label: v });
+      }
+    });
+
+    function weekFor(headerRow, col) {
+      var bestRow = -1;
+      weekMarks.forEach(function (w) { if (w.row <= headerRow && w.row > bestRow) bestRow = w.row; });
+      if (bestRow < 0) return "";
+      var pick = null;
+      weekMarks.forEach(function (w) {
+        if (w.row !== bestRow) return;
+        if (!pick || Math.abs(w.col - col) < Math.abs(pick.col - col)) pick = w;
+      });
+      return pick ? pick.label : "";
+    }
+
+    function blocksInRow(row) {
+      var starts = [];
+      for (var i = 0; i < row.length; i++) {
+        var v = cellText(row, i);
+        if (v && isDayHeading(v)) starts.push(i);
+      }
+      var out = [];
+      starts.forEach(function (s, k) {
+        var end = k + 1 < starts.length ? starts[k + 1] : row.length;
+        var m = headerMap(row.slice(s, end)), known = 0;
+        ["sets", "reps", "load", "rpe", "tempo", "notes"].forEach(function (key) {
+          if (m[key] !== undefined) known++;
+        });
+        if (known < 2) return;
+        Object.keys(m).forEach(function (key) { m[key] += s; });
+        out.push({ nameCol: s, map: m, day: cellText(row, s), start: s });
+      });
+      return out;
+    }
+
+    var weekOrder = [], byWeek = {};
+    function bucket(weekLabel, dayLabel) {
+      if (!byWeek[weekLabel]) { byWeek[weekLabel] = []; weekOrder.push(weekLabel); }
+      var d = byWeek[weekLabel].filter(function (x) { return x.label === dayLabel; })[0];
+      if (!d) { d = { label: dayLabel, items: [] }; byWeek[weekLabel].push(d); }
+      return d;
+    }
+
+    var active = null;
+    for (var br = 0; br < rows.length; br++) {
+      var found = blocksInRow(rows[br]);
+      if (found.length) {
+        active = found.map(function (b) { b.week = weekFor(br, b.start); return b; });
+        continue;
+      }
+      if (!active) continue;
+      active.forEach(function (b) {
+        var exName = cleanCell(cellText(rows[br], b.nameCol));
+        // Templates close each day with their own volume totals.
+        if (!exName || /^total\b/i.test(exName)) return;
+        var line = prescriptionLine(rows[br], b.map, exName);
+        if (line) bucket(b.week, b.day).items.push(line);
+      });
+    }
+
+    if (weekOrder.length) {
+      weekOrder.forEach(function (w) {
+        if (w) lines.push(weekHeading(w));
+        byWeek[w].forEach(function (d) {
+          if (!d.items.length) return;
+          if (d.label) lines.push(dayHeading(d.label));
+          d.items.forEach(function (i) { lines.push(i); });
+        });
+        lines.push("");
+      });
+      return lines;
+    }
+
+    // Weeks across the top with exercise names down a column, each cell holding
+    // only that week's prescription for the exercise named at the start of the
+    // row. This is how almost every real spreadsheet plan is actually built.
+    var weekRow = -1, weekCols = [];
+    for (var wr = 0; wr < Math.min(rows.length, 8); wr++) {
+      var found = [];
+      rows[wr].forEach(function (c, i) { if (isWeekHeading(c)) found.push(i); });
+      if (found.length >= 2) { weekRow = wr; weekCols = found; break; }
+    }
+
+    if (weekRow >= 0) {
+      // A sheet often holds two blocks side by side, each with its own exercise
+      // column, so every week resolves its own: the nearest column to its left
+      // that isn't itself a week and does carry text.
+      function nameColumnFor(col) {
+        for (var j = col - 1; j >= 0; j--) {
+          if (weekCols.indexOf(j) >= 0) continue;
+          for (var r = weekRow + 1; r < rows.length; r++) {
+            if (cellText(rows[r], j)) return j;
+          }
+        }
+        return -1;
+      }
+
+      var weeks = weekCols.map(function (c) {
+        return { label: cellText(rows[weekRow], c), col: c, nameCol: nameColumnFor(c), days: [] };
+      });
+
+      var byNameCol = {};
+      weeks.forEach(function (w) {
+        if (w.nameCol < 0) return;
+        (byNameCol[w.nameCol] = byNameCol[w.nameCol] || []).push(w);
+      });
+
+      Object.keys(byNameCol).forEach(function (key) {
+        var nameCol = parseInt(key, 10);
+        var group = byNameCol[key];
+        var currentDay = "";
+        for (var mr = weekRow + 1; mr < rows.length; mr++) {
+          var name = cellText(rows[mr], nameCol);
+          if (!name) continue;
+          if (isDayHeading(name)) { currentDay = name; continue; }
+          group.forEach(function (w) {
+            var scheme = cellText(rows[mr], w.col).replace(/\s*\n\s*/g, " ");
+            if (!scheme) return;
+            var day = w.days.filter(function (d) { return d.label === currentDay; })[0];
+            if (!day) { day = { label: currentDay, items: [] }; w.days.push(day); }
+            day.items.push(name + " " + scheme);
+          });
+        }
+      });
+
+      weeks.forEach(function (w) {
+        if (!w.days.some(function (d) { return d.items.length; })) return;
+        lines.push(weekHeading(w.label));
+        w.days.forEach(function (d) {
+          if (!d.items.length) return;
+          if (d.label) lines.push(dayHeading(d.label));
+          d.items.forEach(function (i) { lines.push(i); });
+        });
+        lines.push("");
+      });
       return lines;
     }
 
@@ -3240,9 +3485,23 @@
       }));
     }).then(function (loaded) {
       var useName = loaded.length > 1;
+      var perSheet = loaded.map(function (s) {
+        return { lines: rowsToLines(s.rows, useName ? s.name : "") };
+      });
+      // A workbook that has real program sheets usually also has a profile or
+      // instructions sheet. Those produce no week or day structure, so once any
+      // sheet does, the ones that don't are dropped rather than read as prose.
+      var structured = perSheet.filter(function (s) {
+        return s.lines.some(function (l) {
+          var week = /^##\s+(.*)$/.exec(l);
+          if (week) return isWeekHeading(week[1]);
+          var day = /^###\s+(.*)$/.exec(l);
+          return day ? isDayHeading(day[1]) : false;
+        });
+      });
       var lines = [];
-      loaded.forEach(function (s) {
-        lines = lines.concat(rowsToLines(s.rows, useName ? s.name : ""));
+      (structured.length ? structured : perSheet).forEach(function (s) {
+        lines = lines.concat(s.lines);
       });
       return lines;
     });
@@ -3293,7 +3552,10 @@
     if (item.tempo) top.appendChild(el("span", "plan-tag tempo", "tempo"));
 
     var bits = [];
-    if (item.sets) bits.push(item.sets + " × " + (item.repsText || item.reps));
+    if (item.sets) {
+      var reps = item.repsText || (item.reps == null ? "" : String(item.reps));
+      bits.push(reps ? item.sets + " × " + reps : item.sets + " sets");
+    }
     var lt = loadText(item);
     if (lt) bits.push(lt);
     if (bits.length) top.appendChild(el("span", "plan-item-prescription", bits.join("  ·  ")));
@@ -3360,12 +3622,18 @@
     var unWrap = document.getElementById("planUnparsed");
     var unList = document.getElementById("planUnparsedList");
     unList.textContent = "";
-    plan.unparsed.forEach(function (u) {
+    var SHOW = 12;
+    plan.unparsed.slice(0, SHOW).forEach(function (u) {
       var li = document.createElement("li");
       li.appendChild(el("span", "mono", u.line));
       li.appendChild(el("span", "why", " — " + u.reason));
       unList.appendChild(li);
     });
+    if (plan.unparsed.length > SHOW) {
+      var more = document.createElement("li");
+      more.appendChild(el("span", "why", "…and " + (plan.unparsed.length - SHOW) + " more lines"));
+      unList.appendChild(more);
+    }
     unWrap.hidden = plan.unparsed.length === 0;
 
     out.hidden = items === 0 && plan.unparsed.length === 0;
