@@ -1287,9 +1287,9 @@
 
     <section class="plan-intake">
       <div class="plan-drop" id="planDrop" tabindex="0" role="button" aria-label="Drop a plan file here, or click to choose a file">
-        <p class="plan-drop-title">Drop a <span class="mono">.txt</span>, <span class="mono">.md</span> or <span class="mono">.csv</span> plan here</p>
-        <p class="plan-drop-sub">…or click to browse, or just paste the text below.</p>
-        <input type="file" id="planFile" accept=".txt,.md,.csv,text/plain,text/markdown,text/csv" hidden>
+        <p class="plan-drop-title">Drop a plan here</p>
+        <p class="plan-drop-sub"><span class="mono">.docx</span> · <span class="mono">.xlsx</span> · <span class="mono">.csv</span> · <span class="mono">.txt</span> · <span class="mono">.md</span><br>…or click to browse, or paste the text below.</p>
+        <input type="file" id="planFile" accept=".txt,.md,.csv,.docx,.xlsx,.xlsm,text/plain,text/markdown,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       </div>
 
       <div class="plan-paste">
@@ -1323,6 +1323,7 @@
             </tbody>
           </table>
           <p class="plan-format-note"><strong>Tempo</strong> uses the standard four-character notation: <span class="mono">eccentric · pause · concentric · pause</span>, in seconds, where <span class="mono">X</span> means "as fast as you can". So <span class="mono">33X0</span> is three seconds down, three seconds held in the bottom, explosive up, no pause at the top. For the deadlift the order flips to concentric-first, because the pull is the first thing that happens.</p>
+          <p class="plan-format-note"><strong>Word and Excel</strong> files are read the same way. A table with headers — <span class="mono">Exercise</span>, <span class="mono">Sets</span>, <span class="mono">Reps</span>, <span class="mono">Load</span>, <span class="mono">Tempo</span>, <span class="mono">Notes</span>, plus optional <span class="mono">Week</span> and <span class="mono">Day</span> columns — is read column by column. A table with no headers is read as a grid: labels along the top become days, labels down the side become weeks, and each cell is an exercise. Word headings and Excel sheet names become week and day labels too. Whatever is extracted lands in the box on the right, so you can correct it before it's saved.</p>
           <p class="plan-format-note">Anything the parser can't place is listed underneath the plan rather than silently dropped, so you can see exactly what it missed.</p>
         </div>
       </details>
@@ -2795,6 +2796,131 @@
     return item;
   }
 
+  /* ---- tables: Word tables, Excel sheets and CSV all arrive as rows of cells ---- */
+
+  var HEADER_ALIASES = {
+    exercise: ["exercise", "exercises", "lift", "lifts", "movement", "övning", "ovning"],
+    sets: ["sets", "set"],
+    reps: ["reps", "rep", "repetitions"],
+    load: ["load", "weight", "intensity", "kg", "vikt"],
+    tempo: ["tempo"],
+    notes: ["notes", "note", "comment", "comments", "kommentar"],
+    week: ["week", "wk", "vecka"],
+    day: ["day", "session", "pass", "dag"]
+  };
+
+  function headerMap(cells) {
+    var map = {};
+    cells.forEach(function (raw, i) {
+      var c = String(raw || "").toLowerCase().trim();
+      if (!c) return;
+      Object.keys(HEADER_ALIASES).forEach(function (key) {
+        if (map[key] === undefined && HEADER_ALIASES[key].indexOf(c) >= 0) map[key] = i;
+      });
+    });
+    return map;
+  }
+
+  // A cell counts as an exercise if the line parser finds a scheme, a load or a
+  // tempo in it. That one test is what separates a label row or column from data,
+  // so a grid of days across the top and weeks down the side reads correctly.
+  function exerciseLike(text) {
+    var first = String(text || "").trim().split(/\n/)[0];
+    if (!first) return false;
+    var item = parseExerciseLine(first);
+    return !!(item && (item.sets !== null || item.load !== null || item.tempo !== null));
+  }
+
+  function cellText(row, i) { return i === undefined ? "" : String(row[i] === undefined ? "" : row[i]).trim(); }
+
+  function weekHeading(label) {
+    var t = String(label || "").trim();
+    if (!t) return null;
+    return "## " + (/^\d+$/.test(t) ? "Week " + t : t);
+  }
+  function dayHeading(label) {
+    var t = String(label || "").trim();
+    if (!t) return null;
+    return "### " + (/^\d+$/.test(t) ? "Day " + t : t);
+  }
+
+  // Converts a table to the same plain-text plan the textarea holds, rather than
+  // straight to a plan object. The extraction stays visible and editable, and
+  // everything downstream has exactly one input format to understand.
+  function rowsToLines(rows, contextLabel) {
+    rows = rows.filter(function (r) {
+      return r.some(function (c) { return String(c === undefined ? "" : c).trim(); });
+    });
+    if (!rows.length) return [];
+
+    var m = headerMap(rows[0]);
+    var lines = [];
+
+    if (m.exercise !== undefined && Object.keys(m).length >= 2) {
+      var lastWeek = null, lastDay = null;
+      if (contextLabel && m.week === undefined) lines.push(weekHeading(contextLabel));
+      for (var r = 1; r < rows.length; r++) {
+        var row = rows[r];
+        var name = cellText(row, m.exercise);
+        if (!name) continue;
+        var wk = cellText(row, m.week), dy = cellText(row, m.day);
+        if (wk && wk !== lastWeek) { lines.push(weekHeading(wk)); lastWeek = wk; lastDay = null; }
+        if (dy && dy !== lastDay) { lines.push(dayHeading(dy)); lastDay = dy; }
+        var parts = [name];
+        var sets = cellText(row, m.sets), reps = cellText(row, m.reps);
+        if (sets && reps) parts.push(sets + "x" + reps);
+        else if (reps) parts.push("1x" + reps);
+        var load = cellText(row, m.load);
+        if (load) parts.push(/[%a-z]/i.test(load) ? load : load + "kg");
+        var tempo = cellText(row, m.tempo);
+        if (tempo) parts.push("[" + tempo + "]");
+        var note = cellText(row, m.notes);
+        if (note) parts.push("// " + note);
+        lines.push(parts.join(" "));
+      }
+      return lines;
+    }
+
+    // No recognisable header, so treat it as a grid: labels along the top are
+    // days, labels down the side are weeks, and every other cell is an exercise.
+    var topCells = rows[0].slice(1);
+    var hasColLabels = topCells.some(function (c) { return String(c || "").trim(); }) &&
+                       !topCells.some(exerciseLike);
+    var sideCells = rows.slice(hasColLabels ? 1 : 0).map(function (r) { return r[0]; });
+    var hasRowLabels = sideCells.some(function (c) { return String(c || "").trim(); }) &&
+                       !sideCells.some(exerciseLike);
+
+    // Grouped rather than emitted inline: with days across the top and no week
+    // column, every row would otherwise re-open the same day.
+    var groups = [];
+    function groupFor(week, day) {
+      var found = groups.filter(function (g) { return g.week === week && g.day === day; })[0];
+      if (!found) { found = { week: week, day: day, items: [] }; groups.push(found); }
+      return found;
+    }
+
+    for (var rr = hasColLabels ? 1 : 0; rr < rows.length; rr++) {
+      for (var cc = hasRowLabels ? 1 : 0; cc < rows[rr].length; cc++) {
+        var text = cellText(rows[rr], cc);
+        if (!text) continue;
+        var week = hasRowLabels ? cellText(rows[rr], 0) : String(contextLabel || "").trim();
+        var day = hasColLabels ? cellText(rows[0], cc) : "Session " + (rr + (hasColLabels ? 0 : 1));
+        var g = groupFor(week, day);
+        text.split(/\n+/).forEach(function (l) { if (l.trim()) g.items.push(l.trim()); });
+      }
+    }
+
+    var seenWeek = null;
+    groups.forEach(function (g) {
+      if (!g.items.length) return;
+      if (g.week && g.week !== seenWeek) { lines.push(weekHeading(g.week)); seenWeek = g.week; }
+      if (g.day) lines.push(dayHeading(g.day));
+      g.items.forEach(function (i) { lines.push(i); });
+      lines.push("");
+    });
+    return lines;
+  }
+
   function looksLikeCsv(lines) {
     if (!lines.length) return false;
     var head = lines[0].toLowerCase();
@@ -2816,54 +2942,15 @@
     return out.map(function (s) { return s.trim(); });
   }
 
-  function parseCsvPlan(lines) {
+  function csvToLines(lines) {
     var sep = lines[0].indexOf(";") > lines[0].indexOf(",") ? ";" : ",";
-    var headers = splitCsvRow(lines[0], sep).map(function (h) { return h.toLowerCase(); });
-    function col(row, names) {
-      for (var i = 0; i < names.length; i++) {
-        var idx = headers.indexOf(names[i]);
-        if (idx >= 0 && row[idx]) return row[idx];
-      }
-      return "";
-    }
-    var weeks = [], unparsed = [];
-    for (var r = 1; r < lines.length; r++) {
-      if (!lines[r].trim()) continue;
-      var row = splitCsvRow(lines[r], sep);
-      var name = col(row, ["exercise", "lift", "movement"]);
-      if (!name) { unparsed.push({ line: lines[r], reason: "no exercise column value" }); continue; }
-      var parts = [name];
-      var sets = col(row, ["sets"]), reps = col(row, ["reps"]);
-      if (sets && reps) parts.push(sets + "x" + reps);
-      else if (reps) parts.push("1x" + reps);
-      var load = col(row, ["load", "weight", "intensity"]);
-      if (load) parts.push(/[%a-z]/i.test(load) ? load : load + "kg");
-      var tempo = col(row, ["tempo"]);
-      if (tempo) parts.push("[" + tempo + "]");
-      var note = col(row, ["notes", "note", "comment"]);
-      if (note) parts.push("// " + note);
-      var item = parseExerciseLine(parts.join(" "));
-      if (!item) { unparsed.push({ line: lines[r], reason: "could not read the row" }); continue; }
-      var wLabel = col(row, ["week"]) || "Plan";
-      if (/^\d+$/.test(wLabel)) wLabel = "Week " + wLabel;
-      var dLabel = col(row, ["day", "session"]) || "Session";
-      if (/^\d+$/.test(dLabel)) dLabel = "Day " + dLabel;
-      var week = weeks.filter(function (w) { return w.label === wLabel; })[0];
-      if (!week) { week = { label: wLabel, days: [] }; weeks.push(week); }
-      var day = week.days.filter(function (d) { return d.label === dLabel; })[0];
-      if (!day) { day = { label: dLabel, items: [] }; week.days.push(day); }
-      day.items.push(item);
-    }
-    return { weeks: weeks, unparsed: unparsed };
+    return rowsToLines(lines.map(function (l) { return splitCsvRow(l, sep); }), "");
   }
 
   function parsePlan(text) {
     var lines = text.replace(/\r\n?/g, "\n").split("\n");
     var nonEmpty = lines.filter(function (l) { return l.trim(); });
-    if (looksLikeCsv(nonEmpty)) {
-      var csv = parseCsvPlan(nonEmpty);
-      return { title: "", weeks: csv.weeks, unparsed: csv.unparsed };
-    }
+    if (looksLikeCsv(nonEmpty)) lines = csvToLines(nonEmpty);
 
     var plan = { title: "", weeks: [], unparsed: [] };
     var week = null, day = null, sawAny = false;
@@ -2880,13 +2967,17 @@
       if (!t) { day = null; continue; }
 
       var heading = t.match(/^(#{1,6})\s*(.+)$/);
+      var hashes = heading ? heading[1].length : 0;
       var body = heading ? heading[2].trim() : t;
 
-      if (/^(week|wk|w)\s*[:#]?\s*\d+/i.test(body) || (heading && /week/i.test(body))) {
+      // "##" and "###" are explicit week and day markers. Tables extracted from
+      // Word and Excel emit them, so an arbitrary label like "Heavy" survives
+      // the trip through this text form instead of looking like an exercise.
+      if (hashes === 2 || /^(week|wk|w)\s*[:#]?\s*\d+/i.test(body) || (hashes === 1 && /week/i.test(body))) {
         ensureWeek(body.replace(/[:\s]+$/, ""));
         continue;
       }
-      if (heading && !sawAny && !plan.title) { plan.title = body; continue; }
+      if (hashes === 1 && !sawAny && !plan.title) { plan.title = body; continue; }
       if (/^day\s*[:#]?\s*\d+/i.test(body) ||
           /^(mon|tues?|wed(nes)?|thur?s?|fri|sat(ur)?|sun)(day)?\b/i.test(body) ||
           heading ||
@@ -2911,6 +3002,217 @@
       return w.days.length;
     });
     return plan;
+  }
+
+  /* ---------------- .docx and .xlsx ---------------- */
+  // Both are ZIP archives of XML, so one minimal ZIP reader plus DOMParser
+  // covers them. DecompressionStream does the inflating, which keeps this page
+  // a single self-contained file instead of pulling in a spreadsheet library.
+
+  function readZip(buffer) {
+    var view = new DataView(buffer);
+    var bytes = new Uint8Array(buffer);
+    var decoder = new TextDecoder();
+
+    var eocd = -1;
+    var floor = Math.max(0, bytes.length - 22 - 65535);
+    for (var i = bytes.length - 22; i >= floor; i--) {
+      if (view.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error("this doesn't look like a .docx or .xlsx file");
+
+    var count = view.getUint16(eocd + 10, true);
+    var p = view.getUint32(eocd + 16, true);
+    var entries = {};
+    for (var n = 0; n < count; n++) {
+      if (view.getUint32(p, true) !== 0x02014b50) break;
+      var nameLen = view.getUint16(p + 28, true);
+      entries[decoder.decode(bytes.subarray(p + 46, p + 46 + nameLen))] = {
+        method: view.getUint16(p + 10, true),
+        compSize: view.getUint32(p + 20, true),
+        localOffset: view.getUint32(p + 42, true)
+      };
+      p += 46 + nameLen + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
+    }
+
+    return {
+      names: Object.keys(entries),
+      text: function (name) {
+        var e = entries[name];
+        if (!e) return Promise.resolve("");
+        // The central directory's name and extra lengths can disagree with the
+        // local header's, so the data offset has to come from the local header.
+        var lh = e.localOffset;
+        var start = lh + 30 + view.getUint16(lh + 26, true) + view.getUint16(lh + 28, true);
+        var data = bytes.subarray(start, start + e.compSize);
+        if (e.method === 0) return Promise.resolve(decoder.decode(data));
+        if (e.method !== 8) return Promise.reject(new Error("unsupported compression inside the file"));
+        var stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+        return new Response(stream).text();
+      }
+    };
+  }
+
+  var W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+  function xml(text) { return new DOMParser().parseFromString(text, "application/xml"); }
+
+  function joinTags(node, ns, tag) {
+    var els = ns ? node.getElementsByTagNameNS(ns, tag) : node.getElementsByTagName(tag);
+    var out = "";
+    for (var i = 0; i < els.length; i++) out += els[i].textContent;
+    return out;
+  }
+
+  // A paragraph can hold several lines: a shift+enter inside a table cell is a
+  // <w:br/>, not a new paragraph, and stacking exercises that way in one cell is
+  // how most written training plans look. Dropping those breaks would run two
+  // exercises together into one unreadable line.
+  function paragraphLines(p) {
+    var text = "";
+    (function walk(node) {
+      for (var i = 0; i < node.childNodes.length; i++) {
+        var n = node.childNodes[i];
+        if (n.nodeType !== 1) continue;
+        if (n.namespaceURI === W_NS) {
+          if (n.localName === "t") { text += n.textContent; continue; }
+          if (n.localName === "br" || n.localName === "cr") { text += "\n"; continue; }
+          if (n.localName === "tab") { text += " "; continue; }
+        }
+        walk(n);
+      }
+    })(p);
+    return text.replace(/[ \t ]+/g, " ").split("\n")
+               .map(function (s) { return s.trim(); })
+               .filter(function (s) { return s; });
+  }
+
+  function headingPrefix(p) {
+    var style = p.getElementsByTagNameNS(W_NS, "pStyle")[0];
+    if (!style) return "";
+    var val = style.getAttributeNS(W_NS, "val") || style.getAttribute("w:val") || "";
+    if (/^Title$/i.test(val)) return "# ";
+    var level = /^Heading\s*(\d)/i.exec(val);
+    if (!level) return "";
+    return parseInt(level[1], 10) <= 1 ? "## " : "### ";
+  }
+
+  function docxToLines(zip) {
+    return zip.text("word/document.xml").then(function (text) {
+      if (!text) throw new Error("no document body found in that .docx");
+      var body = xml(text).getElementsByTagNameNS(W_NS, "body")[0];
+      if (!body) throw new Error("no document body found in that .docx");
+      var lines = [];
+
+      for (var i = 0; i < body.childNodes.length; i++) {
+        var node = body.childNodes[i];
+        if (node.nodeType !== 1) continue;
+
+        if (node.localName === "p") {
+          var parts = paragraphLines(node);
+          if (!parts.length) continue;
+          var prefix = headingPrefix(node);
+          parts.forEach(function (line) { lines.push(prefix ? prefix + line : line); });
+          continue;
+        }
+
+        if (node.localName === "tbl") {
+          var rows = [];
+          var trs = node.getElementsByTagNameNS(W_NS, "tr");
+          for (var r = 0; r < trs.length; r++) {
+            var row = [];
+            var tcs = trs[r].getElementsByTagNameNS(W_NS, "tc");
+            for (var c = 0; c < tcs.length; c++) {
+              var ps = tcs[c].getElementsByTagNameNS(W_NS, "p");
+              var cell = [];
+              for (var q = 0; q < ps.length; q++) cell = cell.concat(paragraphLines(ps[q]));
+              row.push(cell.join("\n"));
+            }
+            rows.push(row);
+          }
+          lines = lines.concat(rowsToLines(rows, ""));
+        }
+      }
+      return lines;
+    });
+  }
+
+  function columnIndex(ref) {
+    var m = /^([A-Z]+)/.exec(ref || "");
+    if (!m) return 0;
+    var n = 0;
+    for (var i = 0; i < m[1].length; i++) n = n * 26 + (m[1].charCodeAt(i) - 64);
+    return n - 1;
+  }
+
+  function sheetRows(text, shared) {
+    var rowEls = xml(text).getElementsByTagName("row");
+    var rows = [];
+    for (var i = 0; i < rowEls.length; i++) {
+      var cells = [];
+      var cs = rowEls[i].getElementsByTagName("c");
+      for (var j = 0; j < cs.length; j++) {
+        var c = cs[j];
+        var type = c.getAttribute("t");
+        var value;
+        if (type === "s") {
+          var idx = parseInt(joinTags(c, null, "v"), 10);
+          value = shared[idx] === undefined ? "" : shared[idx];
+        } else if (type === "inlineStr") {
+          value = joinTags(c, null, "t");
+        } else {
+          value = joinTags(c, null, "v");
+        }
+        var at = columnIndex(c.getAttribute("r"));
+        while (cells.length < at) cells.push("");
+        cells[at] = value;
+      }
+      rows.push(cells);
+    }
+    return rows;
+  }
+
+  function xlsxToLines(zip) {
+    var shared = [];
+    return zip.text("xl/sharedStrings.xml").then(function (text) {
+      if (text) {
+        var sis = xml(text).getElementsByTagName("si");
+        for (var i = 0; i < sis.length; i++) shared.push(joinTags(sis[i], null, "t"));
+      }
+      return Promise.all([zip.text("xl/workbook.xml"), zip.text("xl/_rels/workbook.xml.rels")]);
+    }).then(function (both) {
+      var rels = {};
+      if (both[1]) {
+        var rs = xml(both[1]).getElementsByTagName("Relationship");
+        for (var i = 0; i < rs.length; i++) {
+          rels[rs[i].getAttribute("Id")] = rs[i].getAttribute("Target").replace(/^\/?xl\//, "").replace(/^\//, "");
+        }
+      }
+      var sheets = [];
+      if (both[0]) {
+        var els = xml(both[0]).getElementsByTagName("sheet");
+        for (var j = 0; j < els.length; j++) {
+          var rid = els[j].getAttribute("r:id") ||
+                    els[j].getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id");
+          var target = rels[rid];
+          if (target) sheets.push({ name: els[j].getAttribute("name") || "", path: "xl/" + target });
+        }
+      }
+      if (!sheets.length) {
+        sheets = zip.names.filter(function (n) { return /^xl\/worksheets\/sheet\d+\.xml$/.test(n); })
+                          .map(function (n) { return { name: "", path: n }; });
+      }
+      return Promise.all(sheets.map(function (s) {
+        return zip.text(s.path).then(function (t) { return { name: s.name, rows: t ? sheetRows(t, shared) : [] }; });
+      }));
+    }).then(function (loaded) {
+      var useName = loaded.length > 1;
+      var lines = [];
+      loaded.forEach(function (s) {
+        lines = lines.concat(rowsToLines(s.rows, useName ? s.name : ""));
+      });
+      return lines;
+    });
   }
 
   /* ---------------- training plans: render ---------------- */
@@ -3105,13 +3407,43 @@
 
     function readFile(file) {
       if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        textEl.value = String(reader.result);
+      var status = document.getElementById("planStatus");
+      var ext = (file.name.split(".").pop() || "").toLowerCase();
+
+      function apply(text) {
+        textEl.value = text;
         var base = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
         if (base) document.getElementById("planName").value = base;
         runPlanParse(true);
-      };
+      }
+
+      if (ext === "doc" || ext === "xls") {
+        status.textContent = "That's the older binary Word/Excel format. Save it as .docx or .xlsx and drop it again.";
+        return;
+      }
+
+      if (ext === "docx" || ext === "xlsx" || ext === "xlsm") {
+        status.textContent = "Reading " + file.name + "…";
+        file.arrayBuffer().then(function (buf) {
+          var zip = readZip(buf);
+          return ext === "docx" ? docxToLines(zip) : xlsxToLines(zip);
+        }).then(function (lines) {
+          var text = lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+          if (!text) {
+            status.textContent = ext === "docx"
+              ? "No text found in that document — is the plan inside a table or an image?"
+              : "No cells with content found in that workbook.";
+            return;
+          }
+          apply(text);
+        }).catch(function (err) {
+          status.textContent = "Couldn't read that file: " + ((err && err.message) || err);
+        });
+        return;
+      }
+
+      var reader = new FileReader();
+      reader.onload = function () { apply(String(reader.result)); };
       reader.readAsText(file);
     }
 
