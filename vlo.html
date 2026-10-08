@@ -554,20 +554,21 @@
         <h3 id="addPeopleTitle">Add athlete</h3>
         <p class="chart-caption" id="addPeopleHint"></p>
         <div class="log-row" style="margin-top:12px;">
-          <input type="search" id="userSearchInput" placeholder="Name or exact email" autocomplete="off" aria-label="Search people">
+          <input type="search" id="userSearchInput" placeholder="Their name or exact email" autocomplete="off" aria-label="Search people">
         </div>
+        <p class="log-note" style="margin-top:6px;">Type at least 2 letters, then press the button next to their name. They'll see it in V-Lo straight away.</p>
         <div class="search-results" id="userSearchResults"></div>
 
         <ul class="people-list" id="sentInviteList"></ul>
 
         <div class="invite-link-box">
-          <p class="chart-caption" style="margin-top:0;">Or share an invite link (works for people without an account too)</p>
+          <p class="chart-caption" style="margin-top:0;"><strong>No V-Lo account yet?</strong> Create a link and send it to them yourself (text, email, chat). The link alone doesn't notify anyone.</p>
           <div class="log-row" style="margin-top:8px;">
             <select id="inviteRoleSelect" class="team-select">
               <option value="member">As athlete</option>
               <option value="coach">As coach</option>
             </select>
-            <button class="btn-ghost" type="button" id="createInviteBtn">Create link</button>
+            <button class="btn-ghost" type="button" id="createInviteBtn">Create invite link</button>
           </div>
           <div class="log-row" id="inviteLinkRow" style="margin-top:8px;" hidden>
             <input type="text" id="inviteLinkOut" readonly aria-label="Invite link">
@@ -653,6 +654,9 @@
           <button class="btn" type="submit" id="authSubmitBtn" style="flex:1; justify-content:center;">Log in</button>
         </div>
         <p class="log-note" id="authStatus"></p>
+        <p class="log-note" id="authResendRow" hidden>
+          <button type="button" class="zone-link" id="authResendBtn">Resend confirmation email</button>
+        </p>
         <p class="log-note">
           <span id="authToggleText">Don't have an account?</span>
           <button type="button" class="zone-link" id="authToggleMode">Sign up</button>
