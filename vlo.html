@@ -457,6 +457,29 @@
     color: var(--fg);
   }
   .log-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .pw-row { position: relative; }
+  .pw-row input { padding-right: 46px; }
+  .pw-toggle {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 0;
+    border-radius: 3px;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .pw-toggle:hover { color: var(--fg); }
+  .pw-toggle:focus-visible { outline: 2px solid var(--accent); }
+  .pw-toggle svg { width: 20px; height: 20px; }
+  .pw-toggle svg[hidden] { display: none; }
+  .auth-forgot { margin-top: -4px; text-align: right; }
   .log-note { font-size: 0.78rem; color: var(--muted); margin: 0; }
 
   .charts-grid {
@@ -1422,9 +1445,16 @@
         <div class="log-row">
           <input type="email" id="authEmail" placeholder="Email" autocomplete="username" required>
         </div>
-        <div class="log-row">
+        <div class="log-row pw-row">
           <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" minlength="6" required>
+          <button type="button" class="pw-toggle" aria-label="Show password" aria-pressed="false">
+            <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10c2.2 3 5.4 4.5 9 4.5s6.8-1.5 9-4.5"/><path d="M5.6 12.6 4 15M9.3 14.2 8.6 17M14.7 14.2l.7 2.8M18.4 12.6 20 15"/></svg>
+            <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
         </div>
+        <p class="log-note auth-forgot" id="authForgotRow">
+          <button type="button" class="zone-link" id="authForgotBtn">Forgot password?</button>
+        </p>
         <div class="log-row">
           <button class="btn" type="submit" id="authSubmitBtn" style="flex:1; justify-content:center;">Log in</button>
         </div>
@@ -1433,6 +1463,21 @@
           <span id="authToggleText">Don't have an account?</span>
           <button type="button" class="zone-link" id="authToggleMode">Sign up</button>
         </p>
+      </form>
+
+      <form id="authResetForm" hidden style="display:flex; flex-direction:column; gap:10px; margin-top:14px;">
+        <p class="chart-caption" style="margin-top:0;">Choose a new password for your account.</p>
+        <div class="log-row pw-row">
+          <input type="password" id="authNewPassword" placeholder="New password" autocomplete="new-password" minlength="6" required>
+          <button type="button" class="pw-toggle" aria-label="Show password" aria-pressed="false">
+            <svg class="eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10c2.2 3 5.4 4.5 9 4.5s6.8-1.5 9-4.5"/><path d="M5.6 12.6 4 15M9.3 14.2 8.6 17M14.7 14.2l.7 2.8M18.4 12.6 20 15"/></svg>
+            <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="log-row">
+          <button class="btn" type="submit" id="authResetBtn" style="flex:1; justify-content:center;">Save new password</button>
+        </div>
+        <p class="log-note" id="authResetStatus"></p>
       </form>
 
       <div id="loggedInPanel" hidden>
@@ -2084,8 +2129,14 @@
     openZoneModal(link.dataset.zone);
   }, true);
   document.getElementById("zoneModalClose").addEventListener("click", closeZoneModal);
+  // Close only when the press *and* release both land on the backdrop, so
+  // dragging out of the dialog (e.g. while selecting text) keeps it open.
+  var zonePressedOnBackdrop = false;
+  document.getElementById("zoneModalOverlay").addEventListener("mousedown", function (e) {
+    zonePressedOnBackdrop = e.target.id === "zoneModalOverlay";
+  });
   document.getElementById("zoneModalOverlay").addEventListener("click", function (e) {
-    if (e.target.id === "zoneModalOverlay") closeZoneModal();
+    if (e.target.id === "zoneModalOverlay" && zonePressedOnBackdrop) closeZoneModal();
   });
 
   /* ---------------- enlarge-chart modal ---------------- */
@@ -2199,8 +2250,12 @@
     });
   });
   document.getElementById("chartModalClose").addEventListener("click", closeChartModal);
+  var chartPressedOnBackdrop = false;
+  document.getElementById("chartModalOverlay").addEventListener("mousedown", function (e) {
+    chartPressedOnBackdrop = e.target.id === "chartModalOverlay";
+  });
   document.getElementById("chartModalOverlay").addEventListener("click", function (e) {
-    if (e.target.id === "chartModalOverlay") closeChartModal();
+    if (e.target.id === "chartModalOverlay" && chartPressedOnBackdrop) closeChartModal();
   });
   document.getElementById("modalRepPrev").addEventListener("click", function () { stepModalRep(-1); });
   document.getElementById("modalRepNext").addEventListener("click", function () { stepModalRep(1); });
@@ -4310,6 +4365,10 @@
   var SUPABASE_URL = "https://amxrrodzdvizndchfeqy.supabase.co";
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFteHJyb2R6ZHZpem5kY2hmZXF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1MzY2MjgsImV4cCI6MjEwNTExMjYyOH0.DK_3jMp83K1DQKW6NVaSK77UNYBtXwfamjkZ3svewO4";
 
+  // Read before createClient: Supabase strips the #...type=recovery hash once
+  // it has turned the password-reset link into a session.
+  var isRecoveryLink = /type=recovery/.test(window.location.hash);
+
   var sb = (window.supabase && SUPABASE_ANON_KEY.indexOf("PASTE_") !== 0)
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -4339,7 +4398,7 @@
       showInvitePreview();
     }
   }
-  function closeAuthModal() { var overlay = authEl("authModalOverlay"); if (overlay) overlay.hidden = true; }
+  function closeAuthModal() { var overlay = authEl("authModalOverlay"); if (overlay) overlay.hidden = true; hidePasswords(); }
 
   function showInvitePreview() {
     if (!sb || !pendingInviteId) return;
@@ -4363,7 +4422,32 @@
     authEl("authSubmitBtn").textContent = mode === "login" ? "Log in" : "Sign up";
     authEl("authToggleText").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
     authEl("authToggleMode").textContent = mode === "login" ? "Sign up" : "Log in";
+    authEl("authForgotRow").hidden = mode !== "login";
     setAuthStatus("");
+  }
+
+  // Put every password field back to hidden (and its eye back to closed).
+  function hidePasswords() {
+    document.querySelectorAll(".pw-toggle").forEach(function (btn) { setPasswordVisible(btn, false); });
+  }
+  function setPasswordVisible(btn, visible) {
+    btn.parentElement.querySelector("input").type = visible ? "text" : "password";
+    // SVG elements have no .hidden property, so set the attribute directly.
+    btn.querySelector(".eye-open").toggleAttribute("hidden", !visible);
+    btn.querySelector(".eye-closed").toggleAttribute("hidden", visible);
+    btn.setAttribute("aria-pressed", visible ? "true" : "false");
+    btn.setAttribute("aria-label", visible ? "Hide password" : "Show password");
+  }
+
+  // Shown when the visitor arrives from a "reset your password" email.
+  function showResetForm() {
+    openAuthModal();
+    setAuthStatus("");
+    authEl("authModalTitle").textContent = "Set a new password";
+    authEl("authForm").hidden = true;
+    authEl("loggedInPanel").hidden = true;
+    authEl("authResetForm").hidden = false;
+    authEl("authNewPassword").focus();
   }
 
   function showLoggedIn(user) {
@@ -4446,6 +4530,54 @@
     });
   }
 
+  document.querySelectorAll(".pw-toggle").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      setPasswordVisible(btn, btn.getAttribute("aria-pressed") !== "true");
+    });
+  });
+
+  var authForgotBtnEl = authEl("authForgotBtn");
+  if (authForgotBtnEl) {
+    authForgotBtnEl.addEventListener("click", function () {
+      if (!sb) { setAuthStatus("Not connected to Supabase yet."); return; }
+      var emailEl = authEl("authEmail");
+      var email = emailEl.value.trim();
+      if (!email || !emailEl.checkValidity()) {
+        setAuthStatus("Type your email above, then click \u201cForgot password?\u201d again.");
+        emailEl.focus();
+        return;
+      }
+      setAuthStatus("Sending reset link\u2026");
+      // The link in the email brings the visitor back to this page. A local
+      // file:// page can't be a redirect target, so fall back to the Site URL
+      // configured in Supabase.
+      var opts = window.location.protocol === "file:" ? {} : { redirectTo: window.location.origin + window.location.pathname };
+      sb.auth.resetPasswordForEmail(email, opts).then(function (res) {
+        if (res.error) { setAuthStatus(res.error.message); return; }
+        setAuthStatus("If there's an account for " + email + ", a reset link is on its way. Check your inbox.");
+      });
+    });
+  }
+
+  var authResetFormEl = authEl("authResetForm");
+  if (authResetFormEl) {
+    authResetFormEl.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var status = authEl("authResetStatus");
+      status.textContent = "Saving\u2026";
+      sb.auth.updateUser({ password: authEl("authNewPassword").value }).then(function (res) {
+        if (res.error) { status.textContent = res.error.message; return; }
+        status.textContent = "";
+        authEl("authNewPassword").value = "";
+        authResetFormEl.hidden = true;
+        hidePasswords();
+        setAuthMode("login");
+        window.history.replaceState({}, "", window.location.pathname + window.location.search);
+        onAuthed(res.data.user);
+      });
+    });
+  }
+
   var goToDemoBtnEl = authEl("goToDemoBtn");
   if (goToDemoBtnEl) {
     goToDemoBtnEl.addEventListener("click", function () {
@@ -4464,6 +4596,7 @@
         authEl("authForm").hidden = false;
         authEl("authEmail").value = "";
         authEl("authPassword").value = "";
+        hidePasswords();
         setAuthMode("login");
       });
     });
@@ -4499,7 +4632,9 @@
   if (authModalCloseEl) authModalCloseEl.addEventListener("click", closeAuthModal);
   var authModalOverlayEl = authEl("authModalOverlay");
   if (authModalOverlayEl) {
-    authModalOverlayEl.addEventListener("click", function (e) { if (e.target.id === "authModalOverlay") closeAuthModal(); });
+    var authPressedOnBackdrop = false;
+    authModalOverlayEl.addEventListener("mousedown", function (e) { authPressedOnBackdrop = e.target.id === "authModalOverlay"; });
+    authModalOverlayEl.addEventListener("click", function (e) { if (e.target.id === "authModalOverlay" && authPressedOnBackdrop) closeAuthModal(); });
   }
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && authModalOverlayEl && !authModalOverlayEl.hidden) closeAuthModal();
@@ -4511,8 +4646,14 @@
   // open right away in signup mode so the invite is actually visible instead
   // of silently waiting for the visitor to click "Log in" on their own.
   if (sb) {
+    sb.auth.onAuthStateChange(function (event) {
+      if (event === "PASSWORD_RECOVERY") showResetForm();
+    });
     sb.auth.getSession().then(function (res) {
-      if (res.data && res.data.session) {
+      if (isRecoveryLink) {
+        // Logged in by the reset link: ask for the new password first.
+        showResetForm();
+      } else if (res.data && res.data.session) {
         onAuthed(res.data.session.user);
       } else if (pendingInviteId) {
         setAuthMode("signup");
