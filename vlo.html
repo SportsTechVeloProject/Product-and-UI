@@ -485,15 +485,12 @@
   .chart-caption { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
   #velChart, #pathChart, #driftChart { width: 100%; height: auto; overflow: visible; }
 
-  .chart-visual {
-    display: block;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: box-shadow 0.18s ease;
-  }
-  .chart-visual:hover, .chart-visual:focus-visible {
+  .chart-visual { display: block; }
+  .chart-visual:focus-visible { outline: none; }
+  .chart-card { transition: box-shadow 0.18s ease; }
+  .chart-card:has(.chart-visual) { cursor: pointer; }
+  .chart-card:has(.chart-visual):hover, .chart-card:has(.chart-visual:focus-visible) {
     box-shadow: 0 0 0 3px var(--accent-glow), 0 0 28px 4px var(--accent-glow);
-    outline: none;
   }
 
   .chart-modal-overlay {
@@ -2192,7 +2189,11 @@
     openChartModal(CHART_TYPES[next]);
   }
   document.querySelectorAll(".chart-visual").forEach(function (el) {
-    el.addEventListener("click", function () { openChartModal(el.dataset.chart); });
+    // The whole card opens the chart, except its own controls (e.g. rep pills).
+    el.closest(".chart-card").addEventListener("click", function (e) {
+      if (e.target.closest("button, a, input, select")) return;
+      openChartModal(el.dataset.chart);
+    });
     el.addEventListener("keydown", function (e) {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openChartModal(el.dataset.chart); }
     });
