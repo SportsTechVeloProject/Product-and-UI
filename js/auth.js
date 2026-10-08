@@ -20,7 +20,10 @@ var sb = (window.supabase && SUPABASE_ANON_KEY.indexOf("PASTE_") !== 0)
 
 var authMode = "login"; // "login" | "signup"
 var pendingInviteId = null;
-var currentTeam = null; // { team_id, role, teamName }
+var currentTeam = null; // { team_id, role, teamName, public_description, private_description }
+var currentUser = null;  // Supabase user (id, email) while logged in
+var currentProfile = null; // { full_name }
+var authNotice = "";     // one-off message for the team page, e.g. after using an invite link
 
 (function readInviteFromUrl() {
   var params = new URLSearchParams(window.location.search);
@@ -58,7 +61,9 @@ function showInvitePreview() {
         return;
       }
       note.hidden = false;
-      note.textContent = "You've been invited to join " + invite.team_name + " as a " + invite.role + ". Sign up or log in to accept.";
+      note.textContent = invite.needs_approval
+        ? "A member of " + invite.team_name + " suggested you join. Sign up or log in to send a join request."
+        : "You've been invited to join " + invite.team_name + " as a " + (invite.role === "member" ? "athlete" : invite.role) + ". Sign up or log in to accept.";
     })
     .catch(function () { /* ignore preview errors, invite is still redeemed on login/signup */ });
 }
@@ -70,6 +75,8 @@ function setAuthMode(mode) {
   authEl("authToggleText").textContent = mode === "login" ? "Don't have an account?" : "Already have an account?";
   authEl("authToggleMode").textContent = mode === "login" ? "Sign up" : "Log in";
   authEl("authForgotRow").hidden = mode !== "login";
+  authEl("authNameRow").hidden = mode !== "signup";
+  authEl("authName").required = mode === "signup";
   setAuthStatus("");
 }
 
@@ -101,10 +108,10 @@ function showLoggedIn(user) {
   authEl("authForm").hidden = true;
   var panel = authEl("loggedInPanel");
   panel.hidden = false;
-  authEl("loggedInStatus").textContent = "Logged in as " + user.email + (currentTeam ? " · " + currentTeam.teamName + " · " + currentTeam.role : " · no team yet");
-  var adminPanel = authEl("adminInvitePanel");
-  adminPanel.hidden = !(currentTeam && (currentTeam.role === "admin" || currentTeam.role === "coach"));
+  var who = currentProfile ? currentProfile.full_name + " (" + user.email + ")" : user.email;
+  authEl("loggedInStatus").textContent = "Logged in as " + who + (currentTeam ? " · " + currentTeam.teamName + " · " + currentTeam.role : " · no team yet");
   updateTeamBadge();
+  if (typeof onAccountChanged === "function") onAccountChanged();
 }
 
 function updateTeamBadge() {
@@ -113,8 +120,31 @@ function updateTeamBadge() {
   badge.textContent = currentTeam ? currentTeam.teamName : "No team assigned";
 }
 
+// Right after logging in, the database can briefly reject the brand-new login
+// token ("JWT issued at future") because Supabase's servers' clocks differ by a
+// second or two. Retry a few times instead of wrongly showing "No team assigned".
+function fetchMembership(user, attempt) {
+  return sb.from("team_members").select("team_id, role, teams(name, public_description, private_description)")
+    .eq("user_id", user.id).limit(1).maybeSingle()
+    .then(function (res) {
+      if (res.error && attempt < 4) {
+        return new Promise(function (resolve) { setTimeout(resolve, 1000 * attempt); })
+          .then(function () { return fetchMembership(user, attempt + 1); });
+      }
+      return res;
+    });
+}
+
 function loadMembership(user) {
-  return sb.from("team_members").select("team_id, role, teams(name, bio)").eq("user_id", user.id).limit(1).maybeSingle()
+  currentUser = user;
+  // Profile second: by then the login token is accepted (see fetchMembership).
+  return fetchMembership(user, 1)
+    .then(function (teamRes) {
+      return sb.from("profiles").select("full_name").eq("id", user.id).maybeSingle().then(function (res) {
+        currentProfile = res.data || null;
+        return teamRes;
+      });
+    })
     .then(function (res) {
       if (res.error) {
         // Surfaced so a "no team yet" caused by a query/permissions problem
@@ -122,7 +152,13 @@ function loadMembership(user) {
         console.error("loadMembership error:", res.error);
       }
       if (res.data) {
-        currentTeam = { team_id: res.data.team_id, role: res.data.role, teamName: res.data.teams.name, bio: res.data.teams.bio || "" };
+        currentTeam = {
+          team_id: res.data.team_id,
+          role: res.data.role,
+          teamName: res.data.teams.name,
+          public_description: res.data.teams.public_description || "",
+          private_description: res.data.teams.private_description || ""
+        };
       } else {
         currentTeam = null;
       }
@@ -139,6 +175,10 @@ function onAuthed(user) {
     if (pendingInviteId) {
       sb.rpc("redeem_invite", { invite_id: pendingInviteId }).then(function (res) {
         pendingInviteId = null;
+        // Links made by an athlete don't add you straight away: they send a join request.
+        if (res.data === "requested") authNotice = "Join request sent. A coach or admin of the team will accept or reject it.";
+        else if (res.data === "joined") authNotice = "You've joined the team.";
+        else if (res.error) authNotice = "That invite link didn't work: " + res.error.message;
         if (!res.error) {
           // clean the ?invite= param out of the address bar
           var url = new URL(window.location.href);
@@ -166,9 +206,12 @@ if (authFormEl) {
     var email = authEl("authEmail").value.trim();
     var password = authEl("authPassword").value;
     setAuthStatus(authMode === "login" ? "Logging in…" : "Signing up…");
+    var name = authEl("authName").value.trim();
+    if (authMode === "signup" && !name) { setAuthStatus("Enter your name."); authEl("authName").focus(); return; }
     var call = authMode === "login"
       ? sb.auth.signInWithPassword({ email: email, password: password })
-      : sb.auth.signUp({ email: email, password: password });
+      // The name is stored with the account; the database copies it into profiles.
+      : sb.auth.signUp({ email: email, password: password, options: { data: { full_name: name } } });
     call.then(function (res) {
       if (res.error) { setAuthStatus(res.error.message); return; }
       if (!res.data.user) { setAuthStatus("Check your email to confirm your account, then log in."); return; }
@@ -236,130 +279,26 @@ if (goToDemoBtnEl) {
 var logoutBtnEl = authEl("logoutBtn");
 if (logoutBtnEl) {
   logoutBtnEl.addEventListener("click", function () {
-    sb.auth.signOut().then(function () {
-      currentTeam = null;
-      updateTeamBadge();
-      authEl("loggedInPanel").hidden = true;
-      authEl("authForm").hidden = false;
-      authEl("authEmail").value = "";
-      authEl("authPassword").value = "";
-      hidePasswords();
-      setAuthMode("login");
-    });
+    signOut();
   });
 }
 
-var createInviteBtnEl = authEl("createInviteBtn");
-if (createInviteBtnEl) {
-  createInviteBtnEl.addEventListener("click", function () {
-    if (!currentTeam) return;
-    var role = authEl("inviteRoleSelect").value;
-    authEl("inviteStatus").textContent = "Creating link…";
-    sb.from("team_invites").insert({ team_id: currentTeam.team_id, role: role }).select().single()
-      .then(function (res) {
-        if (res.error) { authEl("inviteStatus").textContent = res.error.message; return; }
-        var link = window.location.origin + window.location.pathname + "?invite=" + res.data.id;
-        authEl("inviteLinkRow").hidden = false;
-        authEl("inviteLinkOut").value = link;
-        authEl("inviteStatus").textContent = "Share this link any way you like, email, text, chat. Anyone who opens it and signs up (or logs in) joins your team as a " + role + ".";
-      });
+// Shared by the login pop-up and account settings.
+function signOut() {
+  return sb.auth.signOut().then(function () {
+    currentTeam = null;
+    currentUser = null;
+    currentProfile = null;
+    updateTeamBadge();
+    if (typeof onAccountChanged === "function") onAccountChanged();
+    authEl("loggedInPanel").hidden = true;
+    authEl("authForm").hidden = false;
+    authEl("authEmail").value = "";
+    authEl("authPassword").value = "";
+    hidePasswords();
+    setAuthMode("login");
   });
 }
-var copyInviteBtnEl = authEl("copyInviteBtn");
-if (copyInviteBtnEl) {
-  copyInviteBtnEl.addEventListener("click", function () {
-    var input = authEl("inviteLinkOut");
-    input.select();
-    try { document.execCommand("copy"); authEl("inviteStatus").textContent = "Copied."; } catch (e) { /* clipboard not available */ }
-  });
-}
-
-/* ---------------- team pop-up (team badge) ---------------- */
-var BIO_MAX = 500;
-var teamOverlayEl = authEl("teamModalOverlay");
-
-function canEditTeam() {
-  return !!(currentTeam && (currentTeam.role === "coach" || currentTeam.role === "admin"));
-}
-
-function renderTeamModal() {
-  var bioEl = authEl("teamModalBio");
-  authEl("teamBioEditor").hidden = true;
-  authEl("teamBioStatus").textContent = "";
-  bioEl.hidden = false;
-  if (!currentTeam) {
-    authEl("teamModalRole").textContent = "Team";
-    authEl("teamModalTitle").textContent = "No team yet";
-    bioEl.classList.remove("is-empty");
-    bioEl.textContent = "You are not a member of a team yet, you can still work out on your own!";
-    authEl("teamBioEditBtn").hidden = true;
-    return;
-  }
-  authEl("teamModalRole").textContent = "Your team · " + currentTeam.role;
-  authEl("teamModalTitle").textContent = currentTeam.teamName;
-  var empty = !currentTeam.bio.trim();
-  bioEl.classList.toggle("is-empty", empty);
-  bioEl.textContent = !empty ? currentTeam.bio
-    : canEditTeam() ? "No bio yet. Tell your team who you are and what you train for."
-    : "Your coach hasn't written anything here yet.";
-  authEl("teamBioEditBtn").hidden = !canEditTeam();
-}
-
-function openTeamModal() {
-  renderTeamModal();
-  teamOverlayEl.hidden = false;
-  // Pick up edits a coach made since this page loaded.
-  if (sb && currentTeam) {
-    sb.from("teams").select("name, bio").eq("id", currentTeam.team_id).maybeSingle().then(function (res) {
-      if (res.error || !res.data || !currentTeam) return;
-      currentTeam.teamName = res.data.name;
-      currentTeam.bio = res.data.bio || "";
-      updateTeamBadge();
-      if (authEl("teamBioEditor").hidden) renderTeamModal();
-    });
-  }
-}
-function closeTeamModal() { teamOverlayEl.hidden = true; }
-
-function updateBioCount() {
-  authEl("teamBioCount").textContent = authEl("teamBioInput").value.length + " / " + BIO_MAX;
-}
-function startBioEdit() {
-  var input = authEl("teamBioInput");
-  input.value = currentTeam.bio;
-  authEl("teamModalBio").hidden = true;
-  authEl("teamBioEditBtn").hidden = true;
-  authEl("teamBioEditor").hidden = false;
-  authEl("teamBioStatus").textContent = "";
-  updateBioCount();
-  input.focus();
-}
-function saveBio() {
-  var bio = authEl("teamBioInput").value.trim();
-  var saveBtn = authEl("teamBioSave");
-  saveBtn.disabled = true;
-  authEl("teamBioStatus").textContent = "Saving\u2026";
-  sb.from("teams").update({ bio: bio }).eq("id", currentTeam.team_id).select("bio").single().then(function (res) {
-    saveBtn.disabled = false;
-    if (res.error) { authEl("teamBioStatus").textContent = "Couldn't save: " + res.error.message; return; }
-    currentTeam.bio = res.data.bio;
-    renderTeamModal();
-    authEl("teamBioStatus").textContent = "Saved.";
-  });
-}
-
-authEl("teamBadge").addEventListener("click", openTeamModal);
-authEl("teamModalClose").addEventListener("click", closeTeamModal);
-authEl("teamBioEditBtn").addEventListener("click", startBioEdit);
-authEl("teamBioCancel").addEventListener("click", renderTeamModal);
-authEl("teamBioSave").addEventListener("click", saveBio);
-authEl("teamBioInput").addEventListener("input", updateBioCount);
-var teamPressedOnBackdrop = false;
-teamOverlayEl.addEventListener("mousedown", function (e) { teamPressedOnBackdrop = e.target === teamOverlayEl; });
-teamOverlayEl.addEventListener("click", function (e) { if (e.target === teamOverlayEl && teamPressedOnBackdrop) closeTeamModal(); });
-document.addEventListener("keydown", function (e) {
-  if (e.key === "Escape" && !teamOverlayEl.hidden) closeTeamModal();
-});
 
 document.querySelectorAll(".open-auth-btn").forEach(function (b) { b.addEventListener("click", openAuthModal); });
 var authModalCloseEl = authEl("authModalClose");

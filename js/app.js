@@ -15,6 +15,7 @@ function renderExercise(exKey) {
   state.ex = exKey;
   var ex = EXERCISES[exKey];
   document.getElementById("plansView").hidden = true;
+  hideTeamPage();
   document.getElementById("exerciseView").hidden = false;
   document.getElementById("exEyebrow").textContent = ex.name;
   document.getElementById("exHeading").textContent = "Est. 1RM " + ex.oneRM + " kg";
@@ -58,6 +59,7 @@ document.getElementById("logForm").addEventListener("submit", function (e) {
 /* ---------------- exercise tabs ---------------- */
 function showPlans() {
   document.getElementById("exerciseView").hidden = true;
+  hideTeamPage();
   document.getElementById("plansView").hidden = false;
   document.querySelectorAll(".apptab").forEach(function (b) {
     b.setAttribute("aria-selected", b.dataset.view === "plans" ? "true" : "false");
