@@ -876,8 +876,12 @@
   }
   .plan-tag.sensor { border-color: var(--accent); color: var(--accent); }
   .plan-tag.tempo { border-color: var(--zone2); color: var(--zone2); }
-  .plan-item-tempo, .plan-item-note { font-size: 0.8rem; color: var(--muted); margin: 5px 0 0; }
+  .plan-tag.vbt { border-color: var(--good); color: var(--good); }
+  .plan-item-tempo, .plan-item-note, .plan-item-vbt, .plan-item-warn { font-size: 0.8rem; margin: 5px 0 0; }
+  .plan-item-tempo, .plan-item-note { color: var(--muted); }
   .plan-item-note { font-style: italic; }
+  .plan-item-vbt { color: var(--good); font-weight: 500; }
+  .plan-item-warn { color: var(--zone2); }
 
   .plan-unparsed {
     border: 1px solid var(--border);
@@ -1297,6 +1301,7 @@
         <textarea id="planText" spellcheck="false" placeholder="Week 1&#10;Day 1 — Heavy&#10;Back Squat 5x3 @140kg @31X1&#10;Bench Press 4x5 @85kg&#10;Deadlift 3x2 @85% // belt on"></textarea>
         <div class="plan-actions">
           <button class="btn" type="button" id="planParseBtn">Read plan</button>
+          <button class="btn-ghost" type="button" id="planTemplateBtn">Download coach template</button>
           <button class="btn-ghost" type="button" id="planSampleBtn">Load example</button>
           <button class="btn-ghost" type="button" id="planClearBtn">Clear</button>
         </div>
@@ -2740,7 +2745,7 @@
   function parseExerciseLine(raw) {
     var item = {
       raw: raw, name: "", lift: null, sets: null, reps: null, repsText: "",
-      load: null, tempo: null, note: "", warnings: []
+      load: null, tempo: null, velocity: null, velocityLoss: null, note: "", warnings: []
     };
     var rest = " " + raw.replace(/^\s*[-*•]\s+/, "").trim() + " ";
 
@@ -2763,7 +2768,21 @@
       });
     }
 
-    // 3. load — percentage and RPE before any bare "@140", which is kilos
+    // 3. velocity prescriptions, before any percentage rule — "VL20%" is a
+    // velocity-loss cutoff, not twenty percent of a one-rep max.
+    take(/(?:^|\s)(?:vl|velocity\s*loss|hra[dð]atap)\s*:?\s*(\d{1,2})\s*%?/i, function (m) {
+      item.velocityLoss = parseInt(m[1], 10);
+    });
+    if (item.velocityLoss == null) {
+      take(/(?:^|\s)(\d{1,2})\s*%\s*(?:vl\b|velocity\s*loss|loss)/i, function (m) {
+        item.velocityLoss = parseInt(m[1], 10);
+      });
+    }
+    take(/(?:^|\s)@?\s*(\d\.\d{1,2})\s*(?:[-–]\s*(\d\.\d{1,2})\s*)?m\s*\/\s*s/i, function (m) {
+      item.velocity = { min: parseFloat(m[1]), max: m[2] ? parseFloat(m[2]) : null };
+    });
+
+    // 4. load — percentage and RPE before any bare "@140", which is kilos
     take(/(?:^|\s)@?\s*(\d{1,3}(?:\.\d+)?)\s*%/, function (m) {
       item.load = { kind: "pct", value: parseFloat(m[1]) };
     });
@@ -2785,7 +2804,7 @@
       });
     }
 
-    // 4. sets and reps. Time-based work is tried before the plain NxM form,
+    // 5. sets and reps. Time-based work is tried before the plain NxM form,
     // otherwise "3x30sek" reads as thirty reps and loses the unit.
     var gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,3})\s*(sek|sec|mín|min)\b/i, function (m) {
       item.sets = parseInt(m[1], 10);
@@ -2862,7 +2881,7 @@
       });
     }
 
-    // 5. bracketed note, once tempo has had its chance at the brackets
+    // 6. bracketed note, once tempo has had its chance at the brackets
     if (!item.note) take(/\(([^)]*)\)/, function (m) { item.note = m[1]; });
 
     item.name = rest.replace(/[\s,;:@-]+$/, "").replace(/^[\s,;:-]+/, "").replace(/\s+/g, " ").trim();
@@ -2882,6 +2901,8 @@
     load: ["load", "weight", "intensity", "kg", "thyngd", "alag", "vikt"],
     rpe: ["rpe", "rir"],
     tempo: ["tempo", "taktur"],
+    velocity: ["target velocity", "velocity", "target vel", "vel", "m s", "hradi", "malhradi"],
+    velocity_loss: ["velocity loss", "vl", "vel loss", "loss", "hradatap"],
     notes: ["notes", "note", "comment", "comments", "athugasemdir", "athugasemd", "minnispunktar", "kommentar"],
     week: ["week", "wk", "vika", "vecka"],
     day: ["day", "session", "pass", "dag", "dagur", "lota"]
@@ -2945,6 +2966,10 @@
     if (rpe) parts.push("@RPE" + rpe);
     var tempo = cleanCell(cellText(row, m.tempo));
     if (tempo) parts.push("[" + tempo + "]");
+    var vel = cleanCell(cellText(row, m.velocity));
+    if (vel) parts.push(/m\s*\/\s*s/i.test(vel) ? vel : vel + " m/s");
+    var vloss = cleanCell(cellText(row, m.velocity_loss));
+    if (vloss) parts.push("VL" + vloss.replace(/[^\d]/g, "") + "%");
     var note = cleanCell(cellText(row, m.notes));
     if (note) parts.push("// " + note);
     return parts.length > 1 ? parts.join(" ") : "";
@@ -3171,7 +3196,10 @@
         var text = cellText(rows[rr], cc);
         if (!text) continue;
         var week = hasRowLabels ? cellText(rows[rr], 0) : String(contextLabel || "").trim();
-        var day = hasColLabels ? cellText(rows[0], cc) : "Session " + (rr + (hasColLabels ? 0 : 1));
+        // Left blank rather than invented when the sheet has no column labels.
+        // A made-up "Session 3" would otherwise read back as a real day heading
+        // and make an instructions sheet look like a programme.
+        var day = hasColLabels ? cellText(rows[0], cc) : "";
         var g = groupFor(week, day);
         text.split(/\n+/).forEach(function (l) { if (l.trim()) g.items.push(l.trim()); });
       }
@@ -3507,6 +3535,197 @@
     });
   }
 
+  /* ---------------- coach template (.xlsx) ---------------- */
+  // Written by hand rather than with a library: an xlsx is a zip of XML, the
+  // entries are stored uncompressed because a template is a few kilobytes, and
+  // every string is inline so there's no shared-string table to maintain.
+
+  var CRC_TABLE = (function () {
+    var t = new Uint32Array(256);
+    for (var n = 0; n < 256; n++) {
+      var c = n;
+      for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    var c = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipStored(entries) {
+    var enc = new TextEncoder();
+    var parts = [], central = [], offset = 0;
+
+    entries.forEach(function (e) {
+      var name = enc.encode(e.name);
+      var data = enc.encode(e.text);
+      var sum = crc32(data);
+
+      var local = new DataView(new ArrayBuffer(30));
+      local.setUint32(0, 0x04034b50, true);
+      local.setUint16(4, 20, true);
+      local.setUint16(8, 0, true);           // stored, no compression
+      local.setUint32(14, sum, true);
+      local.setUint32(18, data.length, true);
+      local.setUint32(22, data.length, true);
+      local.setUint16(26, name.length, true);
+      parts.push(new Uint8Array(local.buffer), name, data);
+
+      var cd = new DataView(new ArrayBuffer(46));
+      cd.setUint32(0, 0x02014b50, true);
+      cd.setUint16(4, 20, true);
+      cd.setUint16(6, 20, true);
+      cd.setUint16(10, 0, true);
+      cd.setUint32(16, sum, true);
+      cd.setUint32(20, data.length, true);
+      cd.setUint32(24, data.length, true);
+      cd.setUint16(28, name.length, true);
+      cd.setUint32(42, offset, true);
+      central.push(new Uint8Array(cd.buffer), name);
+
+      offset += 30 + name.length + data.length;
+    });
+
+    var cdSize = central.reduce(function (n, p) { return n + p.length; }, 0);
+    var end = new DataView(new ArrayBuffer(22));
+    end.setUint32(0, 0x06054b50, true);
+    end.setUint16(8, entries.length, true);
+    end.setUint16(10, entries.length, true);
+    end.setUint32(12, cdSize, true);
+    end.setUint32(16, offset, true);
+
+    return new Blob(parts.concat(central, [new Uint8Array(end.buffer)]),
+      { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+
+  function xmlEscape(v) {
+    return String(v == null ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function colName(i) {
+    var s = "";
+    i += 1;
+    while (i > 0) { var r = (i - 1) % 26; s = String.fromCharCode(65 + r) + s; i = (i - r - 1) / 26; }
+    return s;
+  }
+
+  function sheetXml(rows, widths) {
+    var cols = widths
+      ? "<cols>" + widths.map(function (w, i) {
+          return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
+        }).join("") + "</cols>"
+      : "";
+    var body = rows.map(function (cells, r) {
+      var tds = cells.map(function (v, c) {
+        if (v === "" || v == null) return "";
+        return '<c r="' + colName(c) + (r + 1) + '" t="inlineStr"><is><t xml:space="preserve">' +
+               xmlEscape(v) + "</t></is></c>";
+      }).join("");
+      return '<row r="' + (r + 1) + '">' + tds + "</row>";
+    }).join("");
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      cols + "<sheetData>" + body + "</sheetData></worksheet>";
+  }
+
+  var TEMPLATE_HEADERS = ["Week", "Day", "Exercise", "Sets", "Reps", "Load",
+                          "Target velocity", "Velocity loss", "Tempo", "Notes"];
+
+  var TEMPLATE_ROWS = [
+    ["1", "Day 1", "Back Squat", "5", "3", "140kg", "", "", "31X1", "belt from set 3"],
+    ["1", "Day 1", "Bench Press", "4", "5", "85%", "", "20", "", "stop the set at 20% loss"],
+    ["1", "Day 1", "Deadlift", "3", "2", "", "0.45-0.55", "", "", "load comes from the velocity"],
+    ["1", "Day 2", "Pause Squat", "3", "2", "120kg", "", "", "33X0", "three seconds in the hole"],
+    ["1", "Day 2", "Barbell Row", "4", "8", "70kg", "", "", "", ""],
+    ["2", "Day 1", "Back Squat", "5", "3", "145kg", "", "15", "31X1", ""],
+    ["2", "Day 1", "Bench Press", "4", "4", "87.5kg", "", "", "", ""],
+    ["2", "Day 2", "Deadlift", "3", "2", "87.5%", "", "", "", ""]
+  ];
+
+  var TEMPLATE_HELP = [
+    ["How to fill in the programme sheet"],
+    [""],
+    ["Only Exercise is required. Leave anything else blank and it is simply not prescribed."],
+    [""],
+    ["Column", "What to write", "Example"],
+    ["Week", "A number, or any label", "1"],
+    ["Day", "A number or a name", "Day 1, Monday, Heavy"],
+    ["Exercise", "Free text. Squat, bench and deadlift are matched to the sensors automatically.", "Back Squat"],
+    ["Sets", "A number", "5"],
+    ["Reps", "A number, a range, or a ladder", "3   or   8-10   or   12-10-8-6"],
+    ["Load", "Kilos, a percentage of 1RM, or an RPE", "140kg   or   85%   or   RPE8"],
+    ["Target velocity", "Bar speed in metres per second, single value or a range", "0.45-0.55"],
+    ["Velocity loss", "Percent drop at which the set stops", "20"],
+    ["Tempo", "Four characters: lowering, pause, lifting, pause. X means explosive.", "31X1"],
+    ["Notes", "Anything else", "belt from set 3"],
+    [""],
+    ["Velocity-based training"],
+    [""],
+    ["Target velocity and Velocity loss are what make this a velocity-based programme."],
+    ["Give a Target velocity and leave Load blank, and V-Lo works out the kilos from the"],
+    ["lifter's own load-velocity profile, which changes as they get stronger."],
+    [""],
+    ["Give both, and V-Lo warns you when that load will not produce that bar speed."],
+    [""],
+    ["Velocity loss ends a set on what the bar actually did rather than on a rep count."],
+    ["Roughly: 10 to 15 percent for strength and speed work, 20 to 25 percent for"],
+    ["hypertrophy. The set stops when the drop is reached, however many reps that takes."],
+    [""],
+    ["Zones that bar speed maps onto"],
+    ["Above 0.75 m/s", "Speed-strength", "rate of force development"],
+    ["0.50 to 0.75 m/s", "Strength-speed", "the bridge, most training volume"],
+    ["0.30 to 0.50 m/s", "Accelerative strength", "competition-lift strength work"],
+    ["Below 0.30 m/s", "Maximal strength", "peaking, near-1RM singles"],
+    [""],
+    ["Deadlift runs its own curve, because bar speed at a maximal pull is lower."],
+    [""],
+    ["You do not have to use this layout. Any spreadsheet works: weeks across the top"],
+    ["with exercises down the side, one sheet per week, or a plain text list. Anything"],
+    ["V-Lo cannot read is listed back to you rather than dropped silently."]
+  ];
+
+  function buildTemplateXlsx() {
+    var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    var sheet1 = sheetXml([TEMPLATE_HEADERS].concat(TEMPLATE_ROWS),
+      [8, 10, 26, 7, 14, 12, 16, 14, 10, 32]);
+    var sheet2 = sheetXml(TEMPLATE_HELP, [22, 46, 30]);
+
+    return zipStored([
+      { name: "[Content_Types].xml", text:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+        '<Default Extension="xml" ContentType="application/xml"/>' +
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+        '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+        "</Types>" },
+      { name: "_rels/.rels", text:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        '<Relationship Id="rId1" Type="' + REL + '/officeDocument" Target="xl/workbook.xml"/>' +
+        "</Relationships>" },
+      { name: "xl/workbook.xml", text:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="' + REL + '">' +
+        '<sheets><sheet name="Programme" sheetId="1" r:id="rId1"/>' +
+        '<sheet name="How to fill it in" sheetId="2" r:id="rId2"/></sheets></workbook>' },
+      { name: "xl/_rels/workbook.xml.rels", text:
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+        '<Relationship Id="rId1" Type="' + REL + '/worksheet" Target="worksheets/sheet1.xml"/>' +
+        '<Relationship Id="rId2" Type="' + REL + '/worksheet" Target="worksheets/sheet2.xml"/>' +
+        "</Relationships>" },
+      { name: "xl/worksheets/sheet1.xml", text: sheet1 },
+      { name: "xl/worksheets/sheet2.xml", text: sheet2 }
+    ]);
+  }
+
   /* ---------------- training plans: render ---------------- */
 
   function prescribedKg(item) {
@@ -3516,6 +3735,14 @@
       return Math.round(EXERCISES[item.lift.key].oneRM * item.load.value / 100 * 2) / 2;
     }
     return null;
+  }
+
+  // Inverse of the load–velocity profile V(%1RM) = a - b * (%1RM/100).
+  // Given a target bar speed, what load should be on the bar today.
+  function loadForVelocity(ex, v) {
+    var pct = ((ex.a - v) / ex.b) * 100;
+    if (!isFinite(pct) || pct < 30 || pct > 105) return null;
+    return { pct: pct, kg: Math.round((ex.oneRM * pct / 100) * 2) / 2 };
   }
 
   function loadText(item) {
@@ -3550,6 +3777,7 @@
     }
 
     if (item.tempo) top.appendChild(el("span", "plan-tag tempo", "tempo"));
+    if (item.velocity || item.velocityLoss != null) top.appendChild(el("span", "plan-tag vbt", "VBT"));
 
     var bits = [];
     if (item.sets) {
@@ -3568,6 +3796,22 @@
 
     // A prescribed load on a sensor-tracked lift has an expected bar speed,
     // straight off the same load–velocity profile the live charts use.
+    if (item.velocity) {
+      var band = item.velocity.max
+        ? item.velocity.min.toFixed(2) + "–" + item.velocity.max.toFixed(2)
+        : item.velocity.min.toFixed(2);
+      var line = "Prescribed velocity " + band + " m/s";
+      if (item.lift) {
+        var zex = EXERCISES[item.lift.key];
+        line += " · " + zoneFor(zex, item.velocity.max || item.velocity.min);
+      }
+      wrap.appendChild(el("p", "plan-item-vbt", line));
+    }
+    if (item.velocityLoss != null) {
+      wrap.appendChild(el("p", "plan-item-vbt",
+        "Stop the set at " + item.velocityLoss + "% velocity loss"));
+    }
+
     var kg = prescribedKg(item);
     if (item.lift && kg) {
       var ex = EXERCISES[item.lift.key];
@@ -3575,6 +3819,31 @@
       wrap.appendChild(el("p", "plan-item-tempo",
         "Target first-rep speed ≈ " + sim.v1.toFixed(2) + " m/s · " + zoneFor(ex, sim.v1) +
         " · " + Math.round(sim.pct) + "% of est. 1RM"));
+
+      // A coach can prescribe both a load and a velocity. When the load's own
+      // predicted speed falls outside the prescribed band they disagree, and
+      // the lifter needs to know which one to follow today.
+      if (item.velocity) {
+        var lo = item.velocity.min;
+        var hi = item.velocity.max || item.velocity.min;
+        if (sim.v1 < lo - 0.02 || sim.v1 > hi + 0.02) {
+          var dir = sim.v1 < lo ? "slower" : "faster";
+          wrap.appendChild(el("p", "plan-item-warn",
+            "That load is " + dir + " than the prescribed band — expect " +
+            sim.v1.toFixed(2) + " m/s, not " + lo.toFixed(2) +
+            (item.velocity.max ? "–" + hi.toFixed(2) : "") + " m/s."));
+        }
+      }
+    } else if (item.lift && item.velocity) {
+      // Velocity prescribed with no load: read the load back off the lifter's
+      // own load–velocity profile. This is the point of velocity-based training.
+      var vex = EXERCISES[item.lift.key];
+      var suggested = loadForVelocity(vex, item.velocity.max || item.velocity.min);
+      if (suggested) {
+        wrap.appendChild(el("p", "plan-item-tempo",
+          "≈ " + suggested.kg + " kg today (" + Math.round(suggested.pct) +
+          "% of est. 1RM) to hit that speed"));
+      }
     }
 
     if (item.note) wrap.appendChild(el("p", "plan-item-note", item.note));
@@ -3685,6 +3954,15 @@
     var fileEl = document.getElementById("planFile");
 
     document.getElementById("planParseBtn").addEventListener("click", function () { runPlanParse(true); });
+
+    document.getElementById("planTemplateBtn").addEventListener("click", function () {
+      var url = URL.createObjectURL(buildTemplateXlsx());
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "V-Lo programme template.xlsx";
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    });
 
     document.getElementById("planSampleBtn").addEventListener("click", function () {
       textEl.value = PLAN_SAMPLE;
