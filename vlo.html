@@ -828,6 +828,26 @@
   .plan-output h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; }
   .muted-small { font-size: 0.8rem; color: var(--muted); }
 
+  #planBlock {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .block-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px 24px; }
+  .block-key {
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); margin: 0;
+  }
+  .block-value { font-size: 0.92rem; font-weight: 600; margin: 3px 0 0; }
+  .block-check {
+    font-size: 0.82rem; margin: 16px 0 0; padding-top: 14px;
+    border-top: 1px solid var(--border);
+  }
+  .block-check.ok { color: var(--good); }
+  .block-check.warn { color: var(--zone2); }
+
   .plan-week { margin-bottom: 28px; }
   .plan-week-head {
     font-family: 'IBM Plex Mono', monospace;
@@ -1339,6 +1359,7 @@
         <h3>Plan overview</h3>
         <span class="mono muted-small" id="planSummary"></span>
       </div>
+      <div id="planBlock" hidden></div>
       <div id="planWeeks"></div>
       <div class="plan-unparsed" id="planUnparsed" hidden>
         <h4>Lines we couldn't read</h4>
@@ -3003,11 +3024,32 @@
   // Converts a table to the same plain-text plan the textarea holds, rather than
   // straight to a plan object. The extraction stays visible and editable, and
   // everything downstream has exactly one input format to understand.
+  var BLOCK_KEYS = ["block name", "block type", "working on", "end goal", "goal", "weeks",
+                    "sessions per week", "session length", "athlete", "notes"];
+
+  // A label/value sheet describing the block rather than a week of training.
+  // Emitted as "::key: value" lines so it survives the trip through the text
+  // box and stays visible and editable like everything else.
+  function blockMetaLines(rows) {
+    var hits = [], out = [];
+    rows.forEach(function (row) {
+      var key = fold(cellText(row, 0));
+      if (BLOCK_KEYS.indexOf(key) < 0) return;
+      hits.push(key);
+      var value = cleanCell(cellText(row, 1));
+      if (value) out.push(":: " + cellText(row, 0) + ": " + value);
+    });
+    return hits.length >= 3 ? out : null;
+  }
+
   function rowsToLines(rows, contextLabel) {
     rows = rows.filter(function (r) {
       return r.some(function (c) { return String(c === undefined ? "" : c).trim(); });
     });
     if (!rows.length) return [];
+
+    var meta = blockMetaLines(rows);
+    if (meta) return meta;
 
     var m = headerMap(rows[0]);
     var lines = [];
@@ -3261,7 +3303,7 @@
     var nonEmpty = lines.filter(function (l) { return l.trim(); });
     if (looksLikeCsv(nonEmpty)) lines = csvToLines(nonEmpty);
 
-    var plan = { title: "", weeks: [], unparsed: [] };
+    var plan = { title: "", meta: {}, weeks: [], unparsed: [] };
     var week = null, day = null, sawAny = false;
 
     function ensureWeek(label) { week = { label: label, days: [] }; plan.weeks.push(week); day = null; }
@@ -3274,6 +3316,9 @@
     for (var i = 0; i < lines.length; i++) {
       var t = lines[i].trim();
       if (!t) { day = null; continue; }
+
+      var metaLine = t.match(/^::\s*([^:]+?)\s*:\s*(.+)$/);
+      if (metaLine) { plan.meta[fold(metaLine[1])] = metaLine[2].trim(); continue; }
 
       var heading = t.match(/^(#{1,6})\s*(.+)$/);
       var hashes = heading ? heading[1].length : 0;
@@ -3527,9 +3572,15 @@
           return day ? isDayHeading(day[1]) : false;
         });
       });
-      var lines = [];
+      // Block metadata describes the whole workbook, so it is kept whichever
+      // sheet carried it, even though that sheet holds no training of its own.
+      var meta = [];
+      perSheet.forEach(function (s) {
+        s.lines.forEach(function (l) { if (l.indexOf("::") === 0) meta.push(l); });
+      });
+      var lines = meta.slice();
       (structured.length ? structured : perSheet).forEach(function (s) {
-        lines = lines.concat(s.lines);
+        s.lines.forEach(function (l) { if (l.indexOf("::") !== 0) lines.push(l); });
       });
       return lines;
     });
@@ -3614,87 +3665,212 @@
     return s;
   }
 
-  function sheetXml(rows, widths) {
+  // Style indices used below, matching the cellXfs order in STYLES_XML.
+  var S = {
+    base: 0, head: 1, title: 2, section: 3, cell: 4, band: 5,
+    example: 6, wrap: 7, muted: 8, label: 9, headLeft: 10
+  };
+
+  var STYLES_XML =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+    '<fonts count="6">' +
+      '<font><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="16"/><color rgb="FF1B1D22"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="12"/><color rgb="FF2247D6"/><name val="Calibri"/></font>' +
+      '<font><sz val="10"/><color rgb="FF6B7480"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
+    "</fonts>" +
+    // Excel requires fill 0 to be none and fill 1 to be gray125.
+    '<fills count="5">' +
+      '<fill><patternFill patternType="none"/></fill>' +
+      '<fill><patternFill patternType="gray125"/></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FF2247D6"/><bgColor indexed="64"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFF4F2EC"/><bgColor indexed="64"/></patternFill></fill>' +
+      '<fill><patternFill patternType="solid"><fgColor rgb="FFFFF6DC"/><bgColor indexed="64"/></patternFill></fill>' +
+    "</fills>" +
+    '<borders count="2">' +
+      "<border><left/><right/><top/><bottom/><diagonal/></border>" +
+      '<border><left/><right/><top/><bottom style="thin"><color rgb="FFD8D3C6"/></bottom><diagonal/></border>' +
+    "</borders>" +
+    '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+    '<cellXfs count="11">' +
+      '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="0"/>' +
+      '<xf xfId="0" numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1"/>' +
+      '<xf xfId="0" numFmtId="0" fontId="3" fillId="0" borderId="0" applyFont="1"/>' +
+      '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="0" fillId="3" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="0" fillId="4" borderId="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="0" fillId="0" borderId="0" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="4" fillId="0" borderId="0" applyFont="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="5" fillId="0" borderId="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +
+      '<xf xfId="0" numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>' +
+    "</cellXfs>" +
+    '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+    "</styleSheet>";
+
+  // A cell is a plain string, or { v, s, n } where s is a style index and n
+  // marks it numeric so Excel treats it as a number rather than flagging it.
+  function cellXml(ref, cell) {
+    var v = cell, style = null, numeric = false;
+    if (cell && typeof cell === "object") { v = cell.v; style = cell.s; numeric = !!cell.n; }
+    var attrs = ' r="' + ref + '"' + (style ? ' s="' + style + '"' : "");
+    if (v === "" || v == null) return style ? "<c" + attrs + "/>" : "";
+    if (numeric) return "<c" + attrs + "><v>" + v + "</v></c>";
+    return "<c" + attrs + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEscape(v) + "</t></is></c>";
+  }
+
+  function sheetXml(rows, widths, opts) {
+    opts = opts || {};
     var cols = widths
       ? "<cols>" + widths.map(function (w, i) {
           return '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>';
         }).join("") + "</cols>"
       : "";
+    // Freezing the header keeps it visible while a coach scrolls down a block.
+    var views = opts.freeze
+      ? '<sheetViews><sheetView workbookViewId="0" showGridLines="' + (opts.gridLines === false ? "0" : "1") + '">' +
+        '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
+        '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews>'
+      : '<sheetViews><sheetView workbookViewId="0" showGridLines="' + (opts.gridLines === false ? "0" : "1") + '"/></sheetViews>';
     var body = rows.map(function (cells, r) {
-      var tds = cells.map(function (v, c) {
-        if (v === "" || v == null) return "";
-        return '<c r="' + colName(c) + (r + 1) + '" t="inlineStr"><is><t xml:space="preserve">' +
-               xmlEscape(v) + "</t></is></c>";
-      }).join("");
-      return '<row r="' + (r + 1) + '">' + tds + "</row>";
+      var tds = cells.map(function (c, i) { return cellXml(colName(i) + (r + 1), c); }).join("");
+      var ht = opts.heights && opts.heights[r]
+        ? ' ht="' + opts.heights[r] + '" customHeight="1"' : "";
+      return '<row r="' + (r + 1) + '"' + ht + ">" + tds + "</row>";
     }).join("");
+    var filter = opts.autoFilter ? '<autoFilter ref="' + opts.autoFilter + '"/>' : "";
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
       '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-      cols + "<sheetData>" + body + "</sheetData></worksheet>";
+      views + cols + "<sheetData>" + body + "</sheetData>" + filter + "</worksheet>";
   }
 
   var TEMPLATE_HEADERS = ["Week", "Day", "Exercise", "Sets", "Reps", "Load",
                           "Target velocity", "Velocity loss", "Tempo", "Notes"];
 
-  var TEMPLATE_ROWS = [
-    ["1", "Day 1", "Back Squat", "5", "3", "140kg", "", "", "31X1", "belt from set 3"],
-    ["1", "Day 1", "Bench Press", "4", "5", "85%", "", "20", "", "stop the set at 20% loss"],
-    ["1", "Day 1", "Deadlift", "3", "2", "", "0.45-0.55", "", "", "load comes from the velocity"],
-    ["1", "Day 2", "Pause Squat", "3", "2", "120kg", "", "", "33X0", "three seconds in the hole"],
-    ["1", "Day 2", "Barbell Row", "4", "8", "70kg", "", "", "", ""],
-    ["2", "Day 1", "Back Squat", "5", "3", "145kg", "", "15", "31X1", ""],
-    ["2", "Day 1", "Bench Press", "4", "4", "87.5kg", "", "", "", ""],
-    ["2", "Day 2", "Deadlift", "3", "2", "87.5%", "", "", "", ""]
+  // Week, Day, Exercise, Sets, Reps, Load, Target velocity, Velocity loss, Tempo, Notes
+  var TEMPLATE_EXAMPLES = [
+    [1, "Day 1", "Back Squat",  5, "3",    "140kg",  "",          "",  "31X1", "example — straight load and tempo"],
+    [1, "Day 1", "Bench Press", 4, "5",    "85%",    "",          20,  "",     "example — stops on velocity loss"],
+    [1, "Day 1", "Deadlift",    3, "2",    "",       "0.45-0.55", "",  "",     "example — load comes from the speed"],
+    [1, "Day 2", "Pause Squat", 3, "2",    "120kg",  "",          "",  "33X0", "example — three seconds in the hole"],
+    [1, "Day 2", "Barbell Row", 4, "8-10", "70kg",   "",          "",  "",     "example — rep range"],
+    [2, "Day 1", "Back Squat",  5, "3",    "145kg",  "",          15,  "31X1", "example"],
+    [2, "Day 1", "Bench Press", 4, "4",    "87.5kg", "",          "",  "",     "example"],
+    [2, "Day 2", "Deadlift",    3, "2",    "87.5%",  "",          "",  "",     "example"]
   ];
 
-  var TEMPLATE_HELP = [
-    ["How to fill in the programme sheet"],
-    [""],
-    ["Only Exercise is required. Leave anything else blank and it is simply not prescribed."],
-    [""],
-    ["Column", "What to write", "Example"],
-    ["Week", "A number, or any label", "1"],
-    ["Day", "A number or a name", "Day 1, Monday, Heavy"],
-    ["Exercise", "Free text. Squat, bench and deadlift are matched to the sensors automatically.", "Back Squat"],
-    ["Sets", "A number", "5"],
-    ["Reps", "A number, a range, or a ladder", "3   or   8-10   or   12-10-8-6"],
-    ["Load", "Kilos, a percentage of 1RM, or an RPE", "140kg   or   85%   or   RPE8"],
-    ["Target velocity", "Bar speed in metres per second, single value or a range", "0.45-0.55"],
-    ["Velocity loss", "Percent drop at which the set stops", "20"],
-    ["Tempo", "Four characters: lowering, pause, lifting, pause. X means explosive.", "31X1"],
-    ["Notes", "Anything else", "belt from set 3"],
-    [""],
-    ["Velocity-based training"],
-    [""],
-    ["Target velocity and Velocity loss are what make this a velocity-based programme."],
-    ["Give a Target velocity and leave Load blank, and V-Lo works out the kilos from the"],
-    ["lifter's own load-velocity profile, which changes as they get stronger."],
-    [""],
-    ["Give both, and V-Lo warns you when that load will not produce that bar speed."],
-    [""],
-    ["Velocity loss ends a set on what the bar actually did rather than on a rep count."],
-    ["Roughly: 10 to 15 percent for strength and speed work, 20 to 25 percent for"],
-    ["hypertrophy. The set stops when the drop is reached, however many reps that takes."],
-    [""],
-    ["Zones that bar speed maps onto"],
-    ["Above 0.75 m/s", "Speed-strength", "rate of force development"],
-    ["0.50 to 0.75 m/s", "Strength-speed", "the bridge, most training volume"],
-    ["0.30 to 0.50 m/s", "Accelerative strength", "competition-lift strength work"],
-    ["Below 0.30 m/s", "Maximal strength", "peaking, near-1RM singles"],
-    [""],
-    ["Deadlift runs its own curve, because bar speed at a maximal pull is lower."],
-    [""],
-    ["You do not have to use this layout. Any spreadsheet works: weeks across the top"],
-    ["with exercises down the side, one sheet per week, or a plain text list. Anything"],
-    ["V-Lo cannot read is listed back to you rather than dropped silently."]
+  var BLANK_ROWS = 60;
+
+  function programmeSheet() {
+    var rows = [];
+    rows.push(TEMPLATE_HEADERS.map(function (h) { return { v: h, s: S.head }; }));
+
+    TEMPLATE_EXAMPLES.forEach(function (r) {
+      rows.push(r.map(function (v, i) {
+        var numeric = (i === 0 || i === 3 || i === 7) && typeof v === "number";
+        return { v: v, s: S.example, n: numeric };
+      }));
+    });
+
+    // Pre-formatted empty rows so the sheet reads as a form to fill in, with
+    // light banding every other row to keep the eye on one line.
+    for (var i = 0; i < BLANK_ROWS; i++) {
+      var style = i % 2 ? S.band : S.cell;
+      rows.push(TEMPLATE_HEADERS.map(function () { return { v: "", s: style }; }));
+    }
+    return sheetXml(rows, [7, 11, 28, 7, 11, 11, 15, 13, 9, 34], {
+      freeze: true,
+      autoFilter: "A1:J1",
+      heights: [22]
+    });
+  }
+
+  function helpSheet() {
+    var T = function (v) { return { v: v, s: S.title }; };
+    var H = function (v) { return { v: v, s: S.section }; };
+    var K = function (v) { return { v: v, s: S.head }; };
+    var W = function (v) { return { v: v, s: S.wrap }; };
+    var M = function (v) { return { v: v, s: S.muted }; };
+    var L = function (v) { return { v: v, s: S.label }; };
+
+    var rows = [
+      [T("How to fill in the programme")],
+      [M("Only Exercise is required. Leave any other column blank and it simply isn't prescribed.")],
+      [],
+      [K("Column"), K("What to write"), K("Example")],
+      [L("Week"), W("A number, or any label you like."), W("1")],
+      [L("Day"), W("A number or a name. Both work."), W("Day 1   ·   Monday   ·   Heavy")],
+      [L("Exercise"), W("Free text. Squat, bench and deadlift are matched to the sensors automatically, including variants like Pause Squat."), W("Back Squat")],
+      [L("Sets"), W("A number."), W("5")],
+      [L("Reps"), W("A number, a range, or a descending ladder."), W("3   ·   8-10   ·   12-10-8-6")],
+      [L("Load"), W("Kilos, a percentage of the lifter's one-rep max, or an RPE."), W("140kg   ·   85%   ·   RPE8")],
+      [L("Target velocity"), W("Bar speed in metres per second. A single value or a range."), W("0.45-0.55")],
+      [L("Velocity loss"), W("The percentage drop at which the set stops."), W("20")],
+      [L("Tempo"), W("Four characters: lowering, pause at the bottom, lifting, pause at the top. X means explosive."), W("31X1 is three seconds down, one second held, explosive up, one second at the top.")],
+      [L("Notes"), W("Anything else. It is shown to the lifter as written."), W("belt from set 3")],
+      [],
+      [H("Programming to velocity")],
+      [W("Target velocity and Velocity loss are the two columns that make this a velocity-based programme rather than a schedule.")],
+      [W("Set a Target velocity and leave Load empty. V-Lo works the kilos out from that lifter's own load–velocity profile, so the weight follows their form on the day instead of a number written weeks ago.")],
+      [W("Fill in both and V-Lo checks them against each other, and warns you when a load will not produce the bar speed you asked for.")],
+      [W("Velocity loss ends a set on what the bar actually did rather than on a rep count. Roughly 10–15% for strength and speed work, 20–25% for hypertrophy. The lifter stops when the drop is reached, however many reps that takes.")],
+      [],
+      [H("What bar speed means")],
+      [K("Bar speed"), K("Zone"), K("What it trains")],
+      [L("above 0.75 m/s"), W("Speed–strength"), W("Rate of force development. Carries over to explosiveness.")],
+      [L("0.50 – 0.75 m/s"), W("Strength–speed"), W("The bridge. Most of a training block's volume lives here.")],
+      [L("0.30 – 0.50 m/s"), W("Accelerative strength"), W("Competition-lift strength work, doubles and triples.")],
+      [L("below 0.30 m/s"), W("Maximal strength"), W("Peaking and near-maximal singles. Used sparingly.")],
+      [M("The deadlift runs its own curve, because bar speed at a maximal pull is lower than in the squat or bench.")],
+      [],
+      [H("You don't have to use this layout")],
+      [W("V-Lo also reads weeks across the top with exercises down the side, one sheet per week, a Word table, a CSV, or a plain text list. Anything it can't read is listed back to you rather than dropped silently.")]
+    ];
+
+    return sheetXml(rows, [19, 52, 44], {
+      gridLines: false,
+      heights: { 0: 24, 2: 8, 14: 8, 15: 22, 21: 8, 22: 22, 29: 8, 30: 22 }
+    });
+  }
+
+  // Keys here are what the importer looks for. Order is the order a coach
+  // thinks in: what block, why, how long, how often, how much time per session.
+  var BLOCK_FIELDS = [
+    ["Block name", "Spring strength block", "Anything you'd call it."],
+    ["Block type", "Strength", "Hypertrophy · Strength · Peaking · Off-season · In-season · Return to play"],
+    ["Working on", "Squat and pull strength", "What this block is actually for."],
+    ["End goal", "Open meet on 14 March", "The thing the block is pointing at. A date helps."],
+    ["Weeks", 6, "How many weeks the block runs."],
+    ["Sessions per week", 4, "How often the athlete trains."],
+    ["Session length", "75 min", "How long they can realistically manage."],
+    ["Athlete", "", "Who it's for."],
+    ["Notes", "", "Injuries, equipment, anything else that shapes it."]
   ];
+
+  function blockSheet() {
+    var rows = [
+      [{ v: "The block", s: S.title }],
+      [{ v: "Context for the whole programme. V-Lo reads this and uses it to sanity-check the work against the goal.", s: S.muted }],
+      [],
+      [{ v: "Field", s: S.head }, { v: "Value", s: S.head }, { v: "What it's for", s: S.head }]
+    ];
+    BLOCK_FIELDS.forEach(function (f) {
+      rows.push([
+        { v: f[0], s: S.label },
+        { v: f[1], s: S.example, n: typeof f[1] === "number" },
+        { v: f[2], s: S.muted }
+      ]);
+    });
+    rows.push([]);
+    rows.push([{ v: "Leave the Value column filled in or clear it — nothing here is required, but the more you give, the more V-Lo can check the programme makes sense for the goal.", s: S.muted }]);
+    return sheetXml(rows, [19, 30, 52], { gridLines: false, heights: { 0: 24, 2: 8 } });
+  }
 
   function buildTemplateXlsx() {
     var REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-    var sheet1 = sheetXml([TEMPLATE_HEADERS].concat(TEMPLATE_ROWS),
-      [8, 10, 26, 7, 14, 12, 16, 14, 10, 32]);
-    var sheet2 = sheetXml(TEMPLATE_HELP, [22, 46, 30]);
-
     return zipStored([
       { name: "[Content_Types].xml", text:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -3702,8 +3878,10 @@
         '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
         '<Default Extension="xml" ContentType="application/xml"/>' +
         '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
         '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
         '<Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+        '<Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
         "</Types>" },
       { name: "_rels/.rels", text:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
@@ -3713,19 +3891,23 @@
       { name: "xl/workbook.xml", text:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="' + REL + '">' +
-        '<sheets><sheet name="Programme" sheetId="1" r:id="rId1"/>' +
-        '<sheet name="How to fill it in" sheetId="2" r:id="rId2"/></sheets></workbook>' },
+        '<sheets><sheet name="The block" sheetId="1" r:id="rId1"/>' +
+        '<sheet name="Programme" sheetId="2" r:id="rId2"/>' +
+        '<sheet name="How to fill it in" sheetId="3" r:id="rId3"/></sheets></workbook>' },
       { name: "xl/_rels/workbook.xml.rels", text:
         '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
         '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
         '<Relationship Id="rId1" Type="' + REL + '/worksheet" Target="worksheets/sheet1.xml"/>' +
         '<Relationship Id="rId2" Type="' + REL + '/worksheet" Target="worksheets/sheet2.xml"/>' +
+        '<Relationship Id="rId3" Type="' + REL + '/worksheet" Target="worksheets/sheet3.xml"/>' +
+        '<Relationship Id="rId4" Type="' + REL + '/styles" Target="styles.xml"/>' +
         "</Relationships>" },
-      { name: "xl/worksheets/sheet1.xml", text: sheet1 },
-      { name: "xl/worksheets/sheet2.xml", text: sheet2 }
+      { name: "xl/styles.xml", text: STYLES_XML },
+      { name: "xl/worksheets/sheet1.xml", text: blockSheet() },
+      { name: "xl/worksheets/sheet2.xml", text: programmeSheet() },
+      { name: "xl/worksheets/sheet3.xml", text: helpSheet() }
     ]);
   }
-
   /* ---------------- training plans: render ---------------- */
 
   function prescribedKg(item) {
@@ -3850,12 +4032,76 @@
     return wrap;
   }
 
+  // What a block of each type should mostly consist of, by velocity zone.
+  var BLOCK_EXPECTATION = {
+    hypertrophy: ["Strength–speed", "Accelerative strength"],
+    strength: ["Accelerative strength", "Maximal strength"],
+    peaking: ["Maximal strength", "Accelerative strength"],
+    power: ["Speed–strength", "Strength–speed"],
+    speed: ["Speed–strength", "Strength–speed"],
+    "off season": ["Strength–speed", "Accelerative strength"],
+    "in season": ["Speed–strength", "Strength–speed"]
+  };
+
+  var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
+                     "weeks", "sessions per week", "session length", "athlete", "notes"];
+
+  // The zone a prescribed item lands in — from the coach's own velocity target
+  // where there is one, otherwise from the load.
+  function itemZone(item) {
+    if (!item.lift) return null;
+    var ex = EXERCISES[item.lift.key];
+    if (item.velocity) return zoneFor(ex, item.velocity.max || item.velocity.min);
+    var kg = prescribedKg(item);
+    return kg ? zoneFor(ex, simulateSet(kg, ex).v1) : null;
+  }
+
+  function renderBlock(plan, zoneCounts) {
+    var host = document.getElementById("planBlock");
+    host.textContent = "";
+    var keys = BLOCK_ORDER.filter(function (k) { return plan.meta[k]; });
+    if (!keys.length) { host.hidden = true; return; }
+    host.hidden = false;
+
+    var grid = el("div", "block-grid");
+    keys.forEach(function (k) {
+      var cell = el("div", "block-field");
+      cell.appendChild(el("p", "block-key", k));
+      cell.appendChild(el("p", "block-value", plan.meta[k]));
+      grid.appendChild(cell);
+    });
+    host.appendChild(grid);
+
+    // Does the work actually point at the stated goal?
+    var type = fold(plan.meta["block type"] || "");
+    var expected = null;
+    Object.keys(BLOCK_EXPECTATION).forEach(function (k) {
+      if (!expected && type.indexOf(k) >= 0) expected = BLOCK_EXPECTATION[k];
+    });
+    var zones = Object.keys(zoneCounts);
+    if (!expected || !zones.length) return;
+
+    var total = zones.reduce(function (n, z) { return n + zoneCounts[z]; }, 0);
+    var onTarget = expected.reduce(function (n, z) { return n + (zoneCounts[z] || 0); }, 0);
+    var share = Math.round((onTarget / total) * 100);
+    var dominant = zones.sort(function (a, b) { return zoneCounts[b] - zoneCounts[a]; })[0];
+
+    var note = el("p", share >= 60 ? "block-check ok" : "block-check warn");
+    note.textContent = share >= 60
+      ? share + "% of the measurable work sits in the zones a " + plan.meta["block type"].toLowerCase() +
+        " block is built on."
+      : "Only " + share + "% of the measurable work is in the zones a " + plan.meta["block type"].toLowerCase() +
+        " block is built on — most of it is " + dominant.toLowerCase() + ".";
+    host.appendChild(note);
+  }
+
   function renderPlan(plan) {
     var out = document.getElementById("planOutput");
     var host = document.getElementById("planWeeks");
     host.textContent = "";
 
     var days = 0, items = 0, tracked = 0, tempos = 0;
+    var zoneCounts = {};
     plan.weeks.forEach(function (w) {
       var wrap = el("div", "plan-week");
       wrap.appendChild(el("p", "plan-week-head", w.label));
@@ -3871,6 +4117,8 @@
           items++;
           if (it.lift) tracked++;
           if (it.tempo) tempos++;
+          var z = itemZone(it);
+          if (z) zoneCounts[z] = (zoneCounts[z] || 0) + 1;
           card.appendChild(renderPlanItem(it));
         });
         grid.appendChild(card);
@@ -3887,6 +4135,7 @@
     ];
     if (tempos) summary.push(tempos + " with tempo");
     document.getElementById("planSummary").textContent = summary.join(" · ");
+    renderBlock(plan, zoneCounts);
 
     var unWrap = document.getElementById("planUnparsed");
     var unList = document.getElementById("planUnparsedList");
