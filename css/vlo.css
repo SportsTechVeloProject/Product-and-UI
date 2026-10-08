@@ -390,6 +390,30 @@
     border-radius: 20px;
   }
 
+  button.team-badge { background: none; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+  button.team-badge:hover { color: var(--fg); border-color: var(--muted); }
+  button.team-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .team-bio { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .team-bio.is-empty { color: var(--muted); font-style: italic; }
+  .team-bio-editor textarea {
+    width: 100%;
+    min-height: 130px;
+    margin-top: 12px;
+    resize: vertical;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 12px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.94rem;
+    line-height: 1.55;
+    color: var(--fg);
+  }
+  .team-bio-editor textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .team-bio-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .team-bio-actions .log-note { margin-right: auto; }
+  #teamBioEditBtn { margin-top: 16px; }
+
   .theme-toggle {
     display: inline-flex;
     align-items: center;

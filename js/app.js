@@ -275,7 +275,7 @@ document.addEventListener("keydown", function (e) {
 });
 
 /* ---------------- light / dark theme toggle ---------------- */
-var THEME_KEY = "vikt-theme";
+var THEME_KEY = "vlo-theme";
 function systemPrefersDark() {
   return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
 }

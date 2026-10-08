@@ -47,16 +47,18 @@ function closeAuthModal() { var overlay = authEl("authModalOverlay"); if (overla
 
 function showInvitePreview() {
   if (!sb || !pendingInviteId) return;
-  sb.from("vikt_team_invites").select("role, vikt_teams(name)").eq("id", pendingInviteId).single()
+  // get_invite works before logging in, so the invite shows on the sign-up screen.
+  sb.rpc("get_invite", { invite_id: pendingInviteId })
     .then(function (res) {
       var note = authEl("authInviteNote");
       if (!note) return;
-      if (res.error || !res.data) {
+      var invite = res.data && res.data[0];
+      if (res.error || !invite) {
         note.hidden = true;
         return;
       }
       note.hidden = false;
-      note.textContent = "You've been invited to join " + res.data.vikt_teams.name + " as a " + res.data.role + ". Sign up or log in to accept.";
+      note.textContent = "You've been invited to join " + invite.team_name + " as a " + invite.role + ". Sign up or log in to accept.";
     })
     .catch(function () { /* ignore preview errors, invite is still redeemed on login/signup */ });
 }
@@ -112,7 +114,7 @@ function updateTeamBadge() {
 }
 
 function loadMembership(user) {
-  return sb.from("vikt_team_members").select("team_id, role, vikt_teams(name)").eq("user_id", user.id).limit(1).maybeSingle()
+  return sb.from("team_members").select("team_id, role, teams(name, bio)").eq("user_id", user.id).limit(1).maybeSingle()
     .then(function (res) {
       if (res.error) {
         // Surfaced so a "no team yet" caused by a query/permissions problem
@@ -120,7 +122,7 @@ function loadMembership(user) {
         console.error("loadMembership error:", res.error);
       }
       if (res.data) {
-        currentTeam = { team_id: res.data.team_id, role: res.data.role, teamName: res.data.vikt_teams.name };
+        currentTeam = { team_id: res.data.team_id, role: res.data.role, teamName: res.data.teams.name, bio: res.data.teams.bio || "" };
       } else {
         currentTeam = null;
       }
@@ -135,7 +137,7 @@ function onAuthed(user) {
   };
   var afterMembership = function () {
     if (pendingInviteId) {
-      sb.rpc("vikt_redeem_invite", { invite_id: pendingInviteId }).then(function (res) {
+      sb.rpc("redeem_invite", { invite_id: pendingInviteId }).then(function (res) {
         pendingInviteId = null;
         if (!res.error) {
           // clean the ?invite= param out of the address bar
@@ -253,7 +255,7 @@ if (createInviteBtnEl) {
     if (!currentTeam) return;
     var role = authEl("inviteRoleSelect").value;
     authEl("inviteStatus").textContent = "Creating link…";
-    sb.from("vikt_team_invites").insert({ team_id: currentTeam.team_id, role: role }).select().single()
+    sb.from("team_invites").insert({ team_id: currentTeam.team_id, role: role }).select().single()
       .then(function (res) {
         if (res.error) { authEl("inviteStatus").textContent = res.error.message; return; }
         var link = window.location.origin + window.location.pathname + "?invite=" + res.data.id;
@@ -271,6 +273,93 @@ if (copyInviteBtnEl) {
     try { document.execCommand("copy"); authEl("inviteStatus").textContent = "Copied."; } catch (e) { /* clipboard not available */ }
   });
 }
+
+/* ---------------- team pop-up (team badge) ---------------- */
+var BIO_MAX = 500;
+var teamOverlayEl = authEl("teamModalOverlay");
+
+function canEditTeam() {
+  return !!(currentTeam && (currentTeam.role === "coach" || currentTeam.role === "admin"));
+}
+
+function renderTeamModal() {
+  var bioEl = authEl("teamModalBio");
+  authEl("teamBioEditor").hidden = true;
+  authEl("teamBioStatus").textContent = "";
+  bioEl.hidden = false;
+  if (!currentTeam) {
+    authEl("teamModalRole").textContent = "Team";
+    authEl("teamModalTitle").textContent = "No team yet";
+    bioEl.classList.remove("is-empty");
+    bioEl.textContent = "You are not a member of a team yet, you can still work out on your own!";
+    authEl("teamBioEditBtn").hidden = true;
+    return;
+  }
+  authEl("teamModalRole").textContent = "Your team · " + currentTeam.role;
+  authEl("teamModalTitle").textContent = currentTeam.teamName;
+  var empty = !currentTeam.bio.trim();
+  bioEl.classList.toggle("is-empty", empty);
+  bioEl.textContent = !empty ? currentTeam.bio
+    : canEditTeam() ? "No bio yet. Tell your team who you are and what you train for."
+    : "Your coach hasn't written anything here yet.";
+  authEl("teamBioEditBtn").hidden = !canEditTeam();
+}
+
+function openTeamModal() {
+  renderTeamModal();
+  teamOverlayEl.hidden = false;
+  // Pick up edits a coach made since this page loaded.
+  if (sb && currentTeam) {
+    sb.from("teams").select("name, bio").eq("id", currentTeam.team_id).maybeSingle().then(function (res) {
+      if (res.error || !res.data || !currentTeam) return;
+      currentTeam.teamName = res.data.name;
+      currentTeam.bio = res.data.bio || "";
+      updateTeamBadge();
+      if (authEl("teamBioEditor").hidden) renderTeamModal();
+    });
+  }
+}
+function closeTeamModal() { teamOverlayEl.hidden = true; }
+
+function updateBioCount() {
+  authEl("teamBioCount").textContent = authEl("teamBioInput").value.length + " / " + BIO_MAX;
+}
+function startBioEdit() {
+  var input = authEl("teamBioInput");
+  input.value = currentTeam.bio;
+  authEl("teamModalBio").hidden = true;
+  authEl("teamBioEditBtn").hidden = true;
+  authEl("teamBioEditor").hidden = false;
+  authEl("teamBioStatus").textContent = "";
+  updateBioCount();
+  input.focus();
+}
+function saveBio() {
+  var bio = authEl("teamBioInput").value.trim();
+  var saveBtn = authEl("teamBioSave");
+  saveBtn.disabled = true;
+  authEl("teamBioStatus").textContent = "Saving\u2026";
+  sb.from("teams").update({ bio: bio }).eq("id", currentTeam.team_id).select("bio").single().then(function (res) {
+    saveBtn.disabled = false;
+    if (res.error) { authEl("teamBioStatus").textContent = "Couldn't save: " + res.error.message; return; }
+    currentTeam.bio = res.data.bio;
+    renderTeamModal();
+    authEl("teamBioStatus").textContent = "Saved.";
+  });
+}
+
+authEl("teamBadge").addEventListener("click", openTeamModal);
+authEl("teamModalClose").addEventListener("click", closeTeamModal);
+authEl("teamBioEditBtn").addEventListener("click", startBioEdit);
+authEl("teamBioCancel").addEventListener("click", renderTeamModal);
+authEl("teamBioSave").addEventListener("click", saveBio);
+authEl("teamBioInput").addEventListener("input", updateBioCount);
+var teamPressedOnBackdrop = false;
+teamOverlayEl.addEventListener("mousedown", function (e) { teamPressedOnBackdrop = e.target === teamOverlayEl; });
+teamOverlayEl.addEventListener("click", function (e) { if (e.target === teamOverlayEl && teamPressedOnBackdrop) closeTeamModal(); });
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && !teamOverlayEl.hidden) closeTeamModal();
+});
 
 document.querySelectorAll(".open-auth-btn").forEach(function (b) { b.addEventListener("click", openAuthModal); });
 var authModalCloseEl = authEl("authModalClose");

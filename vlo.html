@@ -242,7 +242,7 @@
         <button class="apptab" data-ex="deadlift" role="tab" type="button">Deadlift</button>
         <button class="apptab" data-view="plans" role="tab" type="button">Plans</button>
       </nav>
-      <span class="demo-badge" id="teamBadge">No team assigned</span>
+      <button type="button" class="demo-badge team-badge" id="teamBadge" aria-haspopup="dialog">No team assigned</button>
       <span class="demo-badge">Demo · fictional data</span>
       <button class="theme-toggle" type="button" aria-label="Toggle color theme">
         <svg class="icon-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="10" r="4" fill="none" stroke="currentColor" stroke-width="1.6"></circle><g stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="10" y1="1" y2="3.4" x2="10"></line><line x1="10" y1="16.6" y2="19" x2="10"></line><line x1="1" y1="10" x2="3.4" y2="10"></line><line x1="16.6" y1="10" x2="19" y2="10"></line><line x1="3.9" y1="3.9" x2="5.6" y2="5.6"></line><line x1="14.4" y1="14.4" x2="16.1" y2="16.1"></line><line x1="3.9" y1="16.1" x2="5.6" y2="14.4"></line><line x1="14.4" y1="5.6" x2="16.1" y2="3.9"></line></g></svg>
@@ -563,6 +563,27 @@
     </div>
   </div>
 </div><!-- /authModal -->
+
+<div class="zone-modal-overlay" id="teamModalOverlay" hidden>
+  <div class="zone-modal" role="dialog" aria-modal="true" aria-labelledby="teamModalTitle">
+    <button type="button" class="zone-modal-close" id="teamModalClose" aria-label="Close">×</button>
+    <div class="zone-modal-body">
+      <p class="eyebrow" id="teamModalRole">Team</p>
+      <h3 id="teamModalTitle"></h3>
+      <p class="team-bio" id="teamModalBio"></p>
+      <div class="team-bio-editor" id="teamBioEditor" hidden>
+        <textarea id="teamBioInput" maxlength="500" aria-label="Team bio" placeholder="Who you are, what you train for, when you meet…"></textarea>
+        <div class="team-bio-actions">
+          <span class="log-note" id="teamBioCount"></span>
+          <button type="button" class="btn-ghost" id="teamBioCancel">Cancel</button>
+          <button type="button" class="btn" id="teamBioSave">Save</button>
+        </div>
+      </div>
+      <button type="button" class="btn-ghost" id="teamBioEditBtn" hidden>Edit bio</button>
+      <p class="log-note" id="teamBioStatus" style="margin-top:10px;"></p>
+    </div>
+  </div>
+</div><!-- /teamModal -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Load order matters: core defines what the others use, app wires it together. -->
