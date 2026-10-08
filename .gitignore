@@ -1,0 +1,12 @@
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Excel lock files and stray downloads
+~$*
+*.tmp
+
+# local scratch
+.tmp-fixtures/
