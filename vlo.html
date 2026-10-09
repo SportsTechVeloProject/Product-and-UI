@@ -109,10 +109,10 @@
             <tr><th>Zone</th><th>Mean velocity</th><th>Training effect</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="swatch" style="background:var(--accent)"></span>Speed–strength</td><td class="range">&gt; 0.75 m/s</td><td>Explosive work at submaximal loads</td></tr>
-            <tr><td><span class="swatch" style="background:var(--accent); opacity:.75"></span>Strength–speed</td><td class="range">0.50 – 0.75 m/s</td><td>Moderate loads, strength-hypertrophy</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone2)"></span>Accelerative strength</td><td class="range">0.30 – 0.50 m/s</td><td>Heavy doubles and triples</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone2); opacity:.7"></span>Maximal strength</td><td class="range">&lt; 0.30 m/s</td><td>Near-1RM singles, competition attempts</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-1)"></span>Speed–strength</td><td class="range">&gt; 0.75 m/s</td><td>Explosive work at submaximal loads</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-2)"></span>Strength–speed</td><td class="range">0.50 – 0.75 m/s</td><td>Moderate loads, strength-hypertrophy</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-3)"></span>Accelerative strength</td><td class="range">0.30 – 0.50 m/s</td><td>Heavy doubles and triples</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-4)"></span>Maximal strength</td><td class="range">&lt; 0.30 m/s</td><td>Near-1RM singles, competition attempts</td></tr>
           </tbody>
         </table>
       </div>
@@ -309,6 +309,7 @@
       <div>
         <p class="eyebrow" id="exEyebrow">Squat</p>
         <h2 id="exHeading">Est. 1RM 140 kg</h2>
+        <p class="log-note" id="exNotice" hidden></p>
         <p class="exit-link"><a href="#" id="exitDemo2">← Back to overview</a></p>
       </div>
       <form class="log-form" id="logForm">
@@ -321,6 +322,8 @@
       </form>
     </section>
 
+    <p class="set-context" id="setContext"></p>
+
     <section class="charts-grid">
       <div class="chart-card">
         <div class="chart-head">
@@ -332,7 +335,7 @@
         <div class="chart-visual" data-chart="velocity" role="button" tabindex="0" aria-label="Enlarge: bar speed by lift cycle">
           <svg id="velChart" viewBox="0 0 640 260" role="img" aria-label="Bar speed across the lift cycle, one line per rep"></svg>
         </div>
-        <p class="chart-caption">Every rep in the selected set, aligned on one lift cycle instead of time — the fade tracks fatigue rep to rep.</p>
+        <p class="chart-caption" id="velCaption">Every rep in the selected set, aligned on one lift cycle instead of time. Colour shows each rep's training zone; the dot is its top speed.</p>
       </div>
 
       <div class="chart-card">
@@ -349,6 +352,7 @@
           <span><i style="background:var(--chart-left)"></i>Left sleeve</span>
           <span><i style="background:var(--chart-right)"></i>Right sleeve</span>
         </div>
+        <p class="chart-caption" id="pathCaption">How high each end of the bar is through one rep. Where the two lines separate, one side is lower and the bar is tilting. Pick a rep above the chart.</p>
       </div>
 
       <div class="chart-card">
@@ -537,7 +541,7 @@
         <div class="team-stats" id="progressSummary"></div>
         <div class="history-wrap" style="margin-top:16px;">
           <table class="history-table progress-table">
-            <thead><tr><th>Date</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Mean speed</th></tr></thead>
+            <thead><tr><th>Date</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Mean speed</th><th>Fastest rep</th></tr></thead>
             <tbody id="progressRows"></tbody>
           </table>
         </div>
@@ -717,5 +721,6 @@
 <script src="js/plans.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/team.js"></script>
+<script src="js/mysets.js"></script>
 <script src="js/app.js"></script>
 </body></html>

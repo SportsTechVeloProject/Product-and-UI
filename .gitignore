@@ -10,3 +10,7 @@ Thumbs.db
 
 # local scratch
 .tmp-fixtures/
+
+# python
+__pycache__/
+*.pyc

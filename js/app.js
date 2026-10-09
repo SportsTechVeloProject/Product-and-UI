@@ -18,7 +18,19 @@ function renderExercise(exKey) {
   hideTeamPage();
   document.getElementById("exerciseView").hidden = false;
   document.getElementById("exEyebrow").textContent = ex.name;
-  document.getElementById("exHeading").textContent = "Est. 1RM " + ex.oneRM + " kg";
+
+  // Logged in: the lifter's own sets (mysets.js). With none recorded yet the
+  // demo stays, labelled as example data. Logged out: the demo.
+  var recorded = mySets.active && !ex.showingExample;
+  var n = ex.history.length;
+  document.getElementById("exHeading").textContent = recorded
+    ? n + " recorded set" + (n === 1 ? "" : "s")
+    : "Est. 1RM " + ex.oneRM + " kg";
+  var notice = document.getElementById("exNotice");
+  notice.hidden = !mySets.active || recorded;
+  notice.textContent = mySets.status ||
+    "Example data. You haven't recorded any " + ex.name.toLowerCase() + " sets yet; yours will show here once they're recorded.";
+  document.getElementById("logForm").hidden = mySets.active;
 
   document.querySelectorAll(".apptab").forEach(function (b) {
     b.setAttribute("aria-selected", b.dataset.ex === exKey ? "true" : "false");
@@ -26,15 +38,50 @@ function renderExercise(exKey) {
 
   var idx = clamp(state.selected[exKey], 0, ex.history.length - 1);
   var row = ex.history[idx];
-  var sim = simulateSet(row.weight, ex);
+  var sim = setData(ex, row);
   currentPathRep = 0;
 
-  renderVelocityChart(ex, sim);
-  renderPathChart(ex, sim);
-  renderDriftChart(ex, sim);
+  // Say which set the charts are showing, and how to change it.
+  var which = (recorded ? "Showing your set from " : "Showing the example set from ") + row.date +
+    (row.weight === null ? "" : " · " + row.weight + " kg") +
+    (idx === ex.history.length - 1 ? " (the newest)" : "") + ".";
+  document.getElementById("setContext").textContent = which +
+    " Click another set in History below to switch. Click a chart to enlarge it and step through the reps one at a time; hover over a chart to read exact values.";
+
+  // A recorded set has measured rep speeds, but no bar path yet.
+  if (sim.reps) {
+    renderVelocityChart(ex, sim);
+  } else {
+    renderChartMessage("velChart", "No reps calculated for this set yet.");
+    document.getElementById("velLegend").innerHTML = "";
+  }
+  document.getElementById("velCaption").textContent = sim.real
+    ? "Each line is one rep, coloured by the zone of its mean speed; the dot is its measured top speed. The shape between is approximate until the full speed curve is measured."
+    : "Every rep in the selected set, aligned on one lift cycle instead of time. Colour shows each rep's training zone; the dot is its top speed.";
+  // Recorded sets have no bar path yet, so the left/right card compares the
+  // two sleeves' measured speed per rep instead, and front/back says so.
+  var pathCard = document.getElementById("pathChart").closest(".chart-card");
+  pathCard.querySelector("h3").textContent = sim.real ? LR_SPEED_TITLE : "Bar path — left vs right";
+  pathCard.querySelector(".chart-legend.two").hidden = !!sim.real && !sim.reps;
+  var pathCaption = document.getElementById("pathCaption");
+  pathCaption.textContent = sim.real
+    ? lrCheckSummary(sim)
+    : "How high each end of the bar is through one rep. Where the two lines separate, one side is lower and the bar is tilting. Pick a rep above the chart.";
+  pathCaption.hidden = !pathCaption.textContent;
+  if (sim.real) {
+    if (sim.reps) renderLRSpeedChart(sim, "pathChart");
+    else renderChartMessage("pathChart", "No reps calculated for this set yet.");
+    document.getElementById("pathPills").innerHTML = "";
+    renderChartMessage("driftChart", NOT_MEASURED);
+    document.getElementById("driftLegend").innerHTML = "";
+  } else {
+    renderPathChart(ex, sim);
+    renderDriftChart(ex, sim);
+  }
   renderRepZones(ex, sim);
   renderHistory(exKey, ex, idx);
   document.getElementById("driftCaption").textContent = ex.driftCaption;
+  document.getElementById("driftCaption").hidden = !!sim.real;
   if (currentModalChart && !document.getElementById("chartModalOverlay").hidden) {
     openChartModal(currentModalChart);
   }
@@ -154,7 +201,7 @@ var modalSelectedRep = null; // null = all reps overlaid; a number = that one re
 function currentSetSim() {
   var ex = EXERCISES[state.ex];
   var idx = clamp(state.selected[state.ex], 0, ex.history.length - 1);
-  return { ex: ex, sim: simulateSet(ex.history[idx].weight, ex) };
+  return { ex: ex, sim: setData(ex, ex.history[idx]) };
 }
 function renderRepPills(container, repsCount, selectedIdx, onSelect) {
   container.innerHTML = "";
@@ -202,6 +249,20 @@ function openChartModal(type) {
   var twoLegend = document.getElementById("chartModalTwoLegend");
   var caption = document.getElementById("chartModalCaption");
 
+  // Recorded sets: front/back isn't measured, and nothing is without reps.
+  if (sim.real && (type === "drift" || !sim.reps)) {
+    title.textContent = { velocity: "Bar speed by lift cycle", path: LR_SPEED_TITLE, drift: "Bar path — front vs back" }[type];
+    pillsWrap.innerHTML = "";
+    legendWrap.hidden = true;
+    twoLegend.hidden = true;
+    caption.hidden = true;
+    document.getElementById("modalRepPrev").disabled = true;
+    document.getElementById("modalRepNext").disabled = true;
+    renderChartMessage("chartModalSvg", type === "velocity" ? "No reps calculated for this set yet." : NOT_MEASURED);
+    document.getElementById("chartModalOverlay").hidden = false;
+    return;
+  }
+
   renderRepPills(pillsWrap, sim.reps, modalSelectedRep, function (idx) {
     modalSelectedRep = idx;
     openChartModal(type);
@@ -216,9 +277,16 @@ function openChartModal(type) {
     twoLegend.hidden = true;
     caption.hidden = false;
     caption.textContent = modalSelectedRep === null
-      ? "Every rep in the selected set, aligned on one lift cycle instead of time — the fade tracks fatigue rep to rep."
+      ? "Every rep in the selected set, aligned on one lift cycle instead of time. Colour shows each rep's training zone; the dot is its top speed."
       : "Rep " + (modalSelectedRep + 1) + " of " + sim.reps + ", aligned on one lift cycle.";
     renderVelocityChart(ex, sim, { svg: "chartModalSvg", legend: "chartModalLegend" }, modalSelectedRep);
+  } else if (type === "path" && sim.real) {
+    title.textContent = LR_SPEED_TITLE;
+    legendWrap.hidden = true;
+    twoLegend.hidden = false;
+    caption.hidden = false;
+    caption.textContent = lrCheckSummary(sim);
+    renderLRSpeedChart(sim, "chartModalSvg", modalSelectedRep);
   } else if (type === "path") {
     title.textContent = "Bar path — left vs right";
     legendWrap.hidden = true;
