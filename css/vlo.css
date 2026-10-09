@@ -15,6 +15,12 @@
     --chart-right: #B8860B;
     --chart-grid: #DFDACC;
     --good: #2E7D32;
+    /* Training zones, fastest to slowest (front-page table, bar speed chart, rep chips) */
+    --zone-1: #2247D6;
+    --zone-2: #1F8A7E;
+    --zone-3: #B8860B;
+    --zone-4: #B5532A;
+    --warn: #C0392B;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -33,6 +39,11 @@
       --chart-right: #A67C23;
       --chart-grid: #33363D;
       --good: #4CAF50;
+      --zone-1: #6C8CFF;
+      --zone-2: #4FC3B5;
+      --zone-3: #E8C158;
+      --zone-4: #EE8A62;
+      --warn: #FF7A6B;
     }
   }
   :root[data-theme="dark"] {
@@ -51,6 +62,11 @@
     --chart-right: #A67C23;
     --chart-grid: #33363D;
     --good: #4CAF50;
+    --zone-1: #6C8CFF;
+    --zone-2: #4FC3B5;
+    --zone-3: #E8C158;
+    --zone-4: #EE8A62;
+    --warn: #FF7A6B;
   }
 
   * { box-sizing: border-box; }
@@ -570,6 +586,17 @@
   .team-result .team-bio { font-size: 0.9rem; margin-top: 8px; }
   .invite-link-box { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
   .progress-table tbody tr { cursor: default; }
+  .progress-table tbody tr.progress-set { cursor: pointer; }
+  .progress-table tbody tr.progress-set[aria-expanded="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .progress-table tbody tr.progress-detail, .progress-table .rep-table tr { cursor: default; }
+  .progress-table tbody tr.progress-detail:hover, .progress-table .rep-table tr:hover { background: none; }
+  .progress-table tbody tr.progress-detail > td { padding: 4px 16px 16px; }
+  .rep-detail { display: flex; flex-direction: column; gap: 8px; }
+  .rep-table { border-collapse: collapse; width: auto; }
+  .progress-table .rep-table th, .progress-table .rep-table td { padding: 6px 18px 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; text-align: left; }
+  .progress-table .rep-table th { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .progress-table .rep-table td.num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  .progress-table .rep-table tr:last-child td { border-bottom: none; }
 
   @media (max-width: 520px) {
     .stat-tile-wide { grid-column: auto; }
@@ -769,7 +796,10 @@
   }
   .rep-pill[aria-pressed="true"] { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
 
-  .rep-pill-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* Arrows stay either side of the pills; the pills wrap between them. */
+  .rep-pill-nav { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  .rep-pill-nav .rep-pills { flex: 1 1 auto; min-width: 0; }
+  .rep-pill-nav .rep-pill-arrow { flex: none; }
   .rep-pill-arrow {
     display: inline-flex;
     align-items: center;
@@ -830,6 +860,7 @@
   .rep-chip .rn { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; font-family: 'IBM Plex Mono', monospace; }
   .rep-chip .rv { font-family: 'IBM Plex Mono', monospace; font-size: 1.05rem; }
   .rep-chip .rz { font-size: 0.76rem; }
+  .rep-chip .rep-flag, .rep-flag { font-size: 0.72rem; color: var(--warn); font-weight: 500; }
 
   .zone-link, .text-link {
     background: none;
@@ -958,6 +989,8 @@
   /* ---- training plans ---- */
   #exerciseView, #plansView { display: flex; flex-direction: column; gap: 40px; }
   #exerciseView[hidden], #plansView[hidden] { display: none; }
+  .log-form[hidden], #exNotice[hidden] { display: none; }
+  .set-context { font-size: 0.88rem; color: var(--muted); margin: 0 0 14px; max-width: 72ch; }
 
   .plan-intake { display: grid; grid-template-columns: minmax(260px, 0.8fr) 1.2fr; gap: 24px; align-items: stretch; }
   .plan-drop {

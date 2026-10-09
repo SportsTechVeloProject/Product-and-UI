@@ -311,7 +311,8 @@ function showProgress(member) {
   card.scrollIntoView({ behavior: "smooth", block: "start" });
 
   sb.from("sessions")
-    .select("id, exercise, weight_kg, recorded_at, reported_rep_count, reps(left_mean_velocity, right_mean_velocity)")
+    .select("id, exercise, weight_kg, recorded_at, reported_rep_count, " +
+            "reps(rep_index, left_mean_velocity, left_peak_velocity, right_mean_velocity, right_peak_velocity)")
     .eq("user_id", member.user_id)
     .order("recorded_at", { ascending: false })
     .then(function (res) {
@@ -340,17 +341,87 @@ function showProgress(member) {
         authEl("progressSummary").appendChild(statTile(exercise, "Best " + formatKg(best), sub));
       });
 
+      // One row per set; clicking it opens that set's reps underneath.
       var rows = authEl("progressRows");
       sessions.forEach(function (s) {
-        var tr = el("tr");
+        var tr = el("tr", "progress-set");
+        tr.tabIndex = 0;
+        tr.setAttribute("aria-expanded", "false");
         tr.appendChild(el("td", "", formatDate(s.recorded_at)));
         tr.appendChild(el("td", "", s.exercise));
         tr.appendChild(el("td", "num", s.weight_kg === null ? "—" : formatKg(Number(s.weight_kg))));
         tr.appendChild(el("td", "num", String(s.repCount)));
         tr.appendChild(el("td", "num", s.meanSpeed === null ? "—" : s.meanSpeed.toFixed(2) + " m/s"));
+        var best = fastestRep(s.reps);
+        tr.appendChild(el("td", "num", best ? best.speed.toFixed(2) + " m/s (rep " + best.rep + ")" : "—"));
         rows.appendChild(tr);
+
+        var detail = el("tr", "progress-detail");
+        detail.hidden = true;
+        var cell = el("td");
+        cell.colSpan = 6;
+        cell.appendChild(repDetail(s));
+        detail.appendChild(cell);
+        rows.appendChild(detail);
+
+        function toggle() {
+          detail.hidden = !detail.hidden;
+          tr.setAttribute("aria-expanded", String(!detail.hidden));
+        }
+        tr.addEventListener("click", toggle);
+        tr.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+        });
       });
     });
+}
+
+// The set's fastest rep by mean speed (left/right averaged): { rep, speed } or null.
+function fastestRep(reps) {
+  var best = null;
+  reps.forEach(function (r) {
+    var v = repMeanSpeed(r);
+    if (v !== null && (!best || v > best.speed)) best = { rep: r.rep_index, speed: v };
+  });
+  return best;
+}
+
+// The reps of one set: mean and peak bar speed per sleeve, plus velocity loss.
+function repDetail(session) {
+  var box = el("div", "rep-detail");
+  var reps = session.reps.slice().sort(function (a, b) { return a.rep_index - b.rep_index; });
+  if (!reps.length) {
+    box.appendChild(el("p", "log-note", "No reps calculated for this set yet."));
+    return box;
+  }
+
+  function speed(v) { return v === null || v === undefined ? "—" : Number(v).toFixed(2); }
+  var table = el("table", "rep-table");
+  var head = el("tr");
+  ["Rep", "Left mean", "Left peak", "Right mean", "Right peak", ""].forEach(function (h) { head.appendChild(el("th", "", h)); });
+  table.appendChild(el("thead")).appendChild(head);
+  var body = el("tbody");
+  reps.forEach(function (r) {
+    var tr = el("tr");
+    tr.appendChild(el("td", "num", String(r.rep_index)));
+    [r.left_mean_velocity, r.left_peak_velocity, r.right_mean_velocity, r.right_peak_velocity]
+      .forEach(function (v) { tr.appendChild(el("td", "num", speed(v))); });
+    // Flag reps where left and right disagree (threshold: LR_MISMATCH_LIMIT in core.js).
+    var uneven = isUneven(r.left_mean_velocity, r.right_mean_velocity);
+    tr.appendChild(el("td", "rep-flag", uneven
+      ? "Uneven left/right (" + Math.round(lrMismatch(r.left_mean_velocity, r.right_mean_velocity) * 100) + "%)" : ""));
+    body.appendChild(tr);
+  });
+  table.appendChild(body);
+  box.appendChild(table);
+
+  var first = repMeanSpeed(reps[0]), last = repMeanSpeed(reps[reps.length - 1]);
+  var note = "Speeds in m/s. Uneven = left and right mean speeds more than " + Math.round(LR_MISMATCH_LIMIT * 100) + "% apart.";
+  if (reps.length > 1 && first > 0 && last !== null) {
+    note += " Velocity loss, first to last rep: " + Math.round((first - last) / first * 100) + "%.";
+  }
+  box.appendChild(el("p", "log-note", note));
+  return box;
 }
 
 /* ---- join requests (coaches/admins) ---- */
@@ -643,6 +714,7 @@ authEl("accountLogout").addEventListener("click", function () {
 function onAccountChanged() {
   updateProfileButton();
   refreshInbox();
+  loadMySets();
   if (!teamViewEl.hidden) renderTeamPage();
 }
 updateProfileButton();
