@@ -494,7 +494,24 @@
   }
   .team-card h3 { font-size: 1.05rem; text-transform: none; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; }
   .team-card-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-  .team-desc { margin-top: 12px; }
+  .team-desc { max-width: 62ch; }
+  .team-desc[hidden] { display: none; }
+  .team-desc-public { margin-top: 12px; }
+  .team-desc-private { margin-top: 10px; }
+  .team-desc-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .team-desc-public .team-desc-text { font-size: 1.08rem; line-height: 1.55; color: var(--fg); }
+  .team-desc-private .team-desc-text { font-size: 0.9rem; line-height: 1.55; color: var(--muted); }
+  .team-desc-text.is-empty { font-style: italic; color: var(--muted); }
+  .team-desc-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.66rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .team-desc-edit { font-size: 0.82rem; font-style: normal; white-space: nowrap; }
+  .team-desc .team-bio-editor textarea { margin-top: 4px; }
   .team-empty-msg { font-size: 1.05rem; }
   .team-notice {
     background: color-mix(in srgb, var(--accent) 10%, var(--surface));

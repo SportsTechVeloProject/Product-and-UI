@@ -470,6 +470,9 @@
       <div>
         <p class="eyebrow" id="teamEyebrow">Team</p>
         <h2 id="teamHeading">Team</h2>
+        <!-- Like a profile bio: public text first, members-only text below it. -->
+        <div class="team-desc team-desc-public" data-desc="public_description" hidden></div>
+        <div class="team-desc team-desc-private" data-desc="private_description" hidden></div>
         <p class="exit-link"><a href="#" id="teamBack">← Back to training</a></p>
       </div>
     </section>
@@ -495,25 +498,6 @@
     <div id="teamMain" class="team-stack" hidden>
 
       <div class="team-stats" id="teamStats"></div>
-
-      <div class="team-grid">
-        <div class="team-card">
-          <div class="team-card-head">
-            <h3>Public description</h3>
-            <button type="button" class="text-link" data-edit-desc="public_description" hidden>Edit</button>
-          </div>
-          <p class="chart-caption">Shown to anyone who finds the team in search.</p>
-          <div class="team-desc" data-desc="public_description"></div>
-        </div>
-        <div class="team-card">
-          <div class="team-card-head">
-            <h3>Private description</h3>
-            <button type="button" class="text-link" data-edit-desc="private_description" hidden>Edit</button>
-          </div>
-          <p class="chart-caption">Only team members can read this.</p>
-          <div class="team-desc" data-desc="private_description"></div>
-        </div>
-      </div>
 
       <div class="team-grid">
         <div class="team-card">

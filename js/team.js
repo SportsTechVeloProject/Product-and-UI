@@ -91,6 +91,7 @@ function renderTeamPage() {
   if (!currentTeam) {
     authEl("teamEyebrow").textContent = "Team";
     authEl("teamHeading").textContent = "No team yet";
+    renderDescriptions();
     authEl("teamMain").hidden = true;
     authEl("teamNone").hidden = false;
     var loggedIn = !!currentUser;
@@ -136,17 +137,37 @@ function loadTeamDetails() {
   });
 }
 
-/* ---- descriptions ---- */
+/* ---- descriptions (shown under the team name, like a profile bio) ---- */
+var DESC_INFO = {
+  public_description: {
+    label: "Public \u00b7 shown in team search",
+    empty: "Add a public description: what people see when they find the team in search."
+  },
+  private_description: {
+    label: "Private \u00b7 only team members see this",
+    empty: "Add a note for your team: training times, where you meet, house rules."
+  }
+};
+
 function renderDescriptions() {
-  ["public_description", "private_description"].forEach(function (field) {
+  var staff = isTeamStaff();
+  Object.keys(DESC_INFO).forEach(function (field) {
     var box = document.querySelector('[data-desc="' + field + '"]');
     if (box.dataset.editing === "true") return;
     box.innerHTML = "";
-    var text = currentTeam[field].trim();
-    var p = el("p", "team-bio" + (text ? "" : " is-empty"),
-      text || (isTeamStaff() ? "Nothing here yet. Click Edit to write it." : "Nothing here yet."));
+    var text = currentTeam ? currentTeam[field].trim() : "";
+    // Athletes only see text that exists; coaches/admins also see empty slots to fill in.
+    box.hidden = !currentTeam || (!text && !staff);
+    if (box.hidden) return;
+    if (staff) box.appendChild(el("p", "team-desc-label", DESC_INFO[field].label));
+    var p = el("p", "team-desc-text" + (text ? "" : " is-empty"), text || DESC_INFO[field].empty);
+    if (staff) {
+      p.appendChild(document.createTextNode(" "));
+      var edit = button("Edit", "text-link team-desc-edit", function () { startDescEdit(field); });
+      edit.setAttribute("aria-label", "Edit " + (field === "public_description" ? "public" : "private") + " description");
+      p.appendChild(edit);
+    }
     box.appendChild(p);
-    document.querySelector('[data-edit-desc="' + field + '"]').hidden = !isTeamStaff();
   });
 }
 
@@ -154,7 +175,7 @@ function startDescEdit(field) {
   var box = document.querySelector('[data-desc="' + field + '"]');
   box.dataset.editing = "true";
   box.innerHTML = "";
-  document.querySelector('[data-edit-desc="' + field + '"]').hidden = true;
+  box.appendChild(el("p", "team-desc-label", DESC_INFO[field].label));
 
   var wrap = el("div", "team-bio-editor");
   var input = el("textarea");
@@ -174,7 +195,7 @@ function startDescEdit(field) {
   });
   var save = button("Save", "btn", function () {
     save.disabled = true;
-    status.textContent = "Saving…";
+    status.textContent = "Saving\u2026";
     var patch = {};
     patch[field] = input.value.trim();
     sb.from("teams").update(patch).eq("id", currentTeam.team_id).select(field).single().then(function (res) {
@@ -194,10 +215,6 @@ function startDescEdit(field) {
   box.appendChild(wrap);
   input.focus();
 }
-
-document.querySelectorAll("[data-edit-desc]").forEach(function (b) {
-  b.addEventListener("click", function () { startDescEdit(b.dataset.editDesc); });
-});
 
 /* ---- people ---- */
 var lastRoster = [];
