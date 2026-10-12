@@ -34,7 +34,12 @@ var authNotice = "";     // one-off message for the team page, e.g. after using 
 
 function authEl(id) { return document.getElementById(id); }
 
-function setAuthStatus(msg) { var s = authEl("authStatus"); if (s) s.textContent = msg || ""; }
+function setAuthStatus(msg) {
+  var s = authEl("authStatus");
+  if (s) s.textContent = msg || "";
+  var resend = authEl("authResendRow");
+  if (resend) resend.hidden = true;
+}
 
 function openAuthModal() {
   var overlay = authEl("authModalOverlay");
@@ -213,8 +218,22 @@ if (authFormEl) {
       // The name is stored with the account; the database copies it into profiles.
       : sb.auth.signUp({ email: email, password: password, options: { data: { full_name: name } } });
     call.then(function (res) {
-      if (res.error) { setAuthStatus(res.error.message); return; }
-      if (!res.data.user) { setAuthStatus("Check your email to confirm your account, then log in."); return; }
+      if (res.error) {
+        var unconfirmed = res.error.code === "email_not_confirmed" || /not confirmed/i.test(res.error.message);
+        setAuthStatus(unconfirmed
+          ? "Your email isn't confirmed yet. Click the link in the email we sent (check spam too), then log in."
+          : res.error.message);
+        authEl("authResendRow").hidden = !unconfirmed;
+        return;
+      }
+      // With email confirmation on, sign-up returns the new user but no session:
+      // they aren't logged in until they click the link in the email.
+      if (!res.data.session) {
+        setAuthMode("login");
+        setAuthStatus("Almost there: we sent a confirmation link to " + email + ". Click it, then log in here.");
+        authEl("authResendRow").hidden = false;
+        return;
+      }
       onAuthed(res.data.user);
     });
   });
@@ -223,6 +242,15 @@ if (authFormEl) {
 document.querySelectorAll(".pw-toggle").forEach(function (btn) {
   btn.addEventListener("click", function () {
     setPasswordVisible(btn, btn.getAttribute("aria-pressed") !== "true");
+  });
+});
+
+authEl("authResendBtn").addEventListener("click", function () {
+  var email = authEl("authEmail").value.trim();
+  if (!email) { setAuthStatus("Type your email above first."); return; }
+  setAuthStatus("Sending\u2026");
+  sb.auth.resend({ type: "signup", email: email }).then(function (res) {
+    setAuthStatus(res.error ? res.error.message : "New confirmation email sent to " + email + ". Check your inbox and spam.");
   });
 });
 
