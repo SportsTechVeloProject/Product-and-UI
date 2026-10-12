@@ -109,10 +109,10 @@
             <tr><th>Zone</th><th>Mean velocity</th><th>Training effect</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="swatch" style="background:var(--accent)"></span>Speed–strength</td><td class="range">&gt; 0.75 m/s</td><td>Explosive work at submaximal loads</td></tr>
-            <tr><td><span class="swatch" style="background:var(--accent); opacity:.75"></span>Strength–speed</td><td class="range">0.50 – 0.75 m/s</td><td>Moderate loads, strength-hypertrophy</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone2)"></span>Accelerative strength</td><td class="range">0.30 – 0.50 m/s</td><td>Heavy doubles and triples</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone2); opacity:.7"></span>Maximal strength</td><td class="range">&lt; 0.30 m/s</td><td>Near-1RM singles, competition attempts</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-1)"></span>Speed–strength</td><td class="range">&gt; 0.75 m/s</td><td>Explosive work at submaximal loads</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-2)"></span>Strength–speed</td><td class="range">0.50 – 0.75 m/s</td><td>Moderate loads, strength-hypertrophy</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-3)"></span>Accelerative strength</td><td class="range">0.30 – 0.50 m/s</td><td>Heavy doubles and triples</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-4)"></span>Maximal strength</td><td class="range">&lt; 0.30 m/s</td><td>Near-1RM singles, competition attempts</td></tr>
           </tbody>
         </table>
       </div>
@@ -309,6 +309,7 @@
       <div>
         <p class="eyebrow" id="exEyebrow">Squat</p>
         <h2 id="exHeading">Est. 1RM 140 kg</h2>
+        <p class="log-note" id="exNotice" hidden></p>
         <p class="exit-link"><a href="#" id="exitDemo2">← Back to overview</a></p>
       </div>
       <form class="log-form" id="logForm">
@@ -321,6 +322,8 @@
       </form>
     </section>
 
+    <p class="set-context" id="setContext"></p>
+
     <section class="charts-grid">
       <div class="chart-card">
         <div class="chart-head">
@@ -332,7 +335,7 @@
         <div class="chart-visual" data-chart="velocity" role="button" tabindex="0" aria-label="Enlarge: bar speed by lift cycle">
           <svg id="velChart" viewBox="0 0 640 260" role="img" aria-label="Bar speed across the lift cycle, one line per rep"></svg>
         </div>
-        <p class="chart-caption">Every rep in the selected set, aligned on one lift cycle instead of time — the fade tracks fatigue rep to rep.</p>
+        <p class="chart-caption" id="velCaption">Every rep in the selected set, aligned on one lift cycle instead of time. Colour shows each rep's training zone; the dot is its top speed.</p>
       </div>
 
       <div class="chart-card">
@@ -349,6 +352,7 @@
           <span><i style="background:var(--chart-left)"></i>Left sleeve</span>
           <span><i style="background:var(--chart-right)"></i>Right sleeve</span>
         </div>
+        <p class="chart-caption" id="pathCaption">How high each end of the bar is through one rep. Where the two lines separate, one side is lower and the bar is tilting. Pick a rep above the chart.</p>
       </div>
 
       <div class="chart-card">
@@ -389,6 +393,37 @@
 
    <div id="plansView" hidden>
 
+    <!-- Logged in: switch between your own training and the plan builder (training.js). -->
+    <div class="plans-switch" id="plansSwitch" role="tablist" aria-label="Plans" hidden>
+      <button type="button" role="tab" id="plansTabTraining" aria-selected="true">My training</button>
+      <button type="button" role="tab" id="plansTabBuilder" aria-selected="false">Plan builder</button>
+    </div>
+
+    <div id="trainingView" hidden>
+      <section class="app-hero">
+        <div>
+          <p class="eyebrow" id="trainingEyebrow">My training</p>
+          <h2 id="trainingHeading">Your workouts</h2>
+          <p class="exit-link" id="trainingBackRow" hidden><a href="#" id="trainingBack">← Back to my own training</a></p>
+        </div>
+        <div class="training-hero-actions">
+          <button class="btn-ghost" type="button" id="freeWorkoutBtn">Start a free workout</button>
+          <p class="log-note">For days without a plan, e.g. active recovery.</p>
+        </div>
+      </section>
+      <div class="team-notice training-pending" id="trainingPending" hidden></div>
+      <p class="log-note training-status" id="trainingStatus"></p>
+      <div class="training-layout" id="trainingLayout" hidden>
+        <div class="training-side">
+          <div class="training-cal" id="trainingCalendar"></div>
+          <nav class="training-list" id="trainingList" aria-label="Workouts"></nav>
+        </div>
+        <section class="training-day" id="trainingDay" aria-live="polite"></section>
+      </div>
+    </div>
+
+    <div id="planBuilderView">
+
     <section class="app-hero">
       <div>
         <p class="eyebrow">Training plans</p>
@@ -404,6 +439,44 @@
       </div>
     </section>
 
+    <!-- Coaches only (coachplans.js): the team's saved plans, and assigning one to an athlete. -->
+    <section class="team-card coach-plans" id="coachPlans" hidden>
+      <div class="team-card-head">
+        <div>
+          <p class="eyebrow">Your team</p>
+          <h3>Team plans</h3>
+        </div>
+      </div>
+      <p class="log-note" id="coachPlansStatus"></p>
+      <ul class="people-list" id="coachPlanList"></ul>
+
+      <div class="assign-panel" id="assignPanel" hidden>
+        <h4 id="assignTitle">Assign plan</h4>
+        <div class="assign-grid">
+          <label class="assign-field">
+            <span>Athlete</span>
+            <select class="team-select" id="assignAthlete"></select>
+          </label>
+          <label class="assign-field">
+            <span>Start date</span>
+            <input class="team-select" type="date" id="assignStart">
+          </label>
+          <div class="assign-field">
+            <span>Training days</span>
+            <div class="weekday-picks" id="assignWeekdays" role="group" aria-label="Training weekdays"></div>
+          </div>
+        </div>
+        <p class="log-note" id="assignNote"></p>
+        <div class="assign-preview" id="assignPreview"></div>
+        <div class="plan-actions">
+          <button class="btn" type="button" id="assignConfirmBtn">Assign plan</button>
+          <button class="btn-ghost" type="button" id="assignCancelBtn">Cancel</button>
+        </div>
+        <h4 class="assign-current-title" id="assignCurrentTitle" hidden>Already assigned</h4>
+        <ul class="people-list" id="assignCurrent"></ul>
+      </div>
+    </section>
+
     <section class="plan-intake">
       <div class="plan-drop" id="planDrop" tabindex="0" role="button" aria-label="Drop a plan file here, or click to choose a file">
         <p class="plan-drop-title">Drop a plan here</p>
@@ -416,6 +489,7 @@
         <textarea id="planText" spellcheck="false" placeholder="Week 1&#10;Day 1 — Heavy&#10;Back Squat 5x3 @140kg @31X1&#10;Bench Press 4x5 @85kg&#10;Deadlift 3x2 @85% // belt on"></textarea>
         <div class="plan-actions">
           <button class="btn" type="button" id="planParseBtn">Read plan</button>
+          <button class="btn" type="button" id="planSaveTeamBtn" hidden>Save to team</button>
           <button class="btn-ghost" type="button" id="planTemplateBtn">Download coach template</button>
           <button class="btn-ghost" type="button" id="planSampleBtn">Load example</button>
           <button class="btn-ghost" type="button" id="planClearBtn">Clear</button>
@@ -462,6 +536,7 @@
       </div>
     </section>
 
+    </div><!-- /planBuilderView -->
    </div><!-- /plansView -->
 
    <div id="teamView" hidden>
@@ -516,12 +591,15 @@
             <p class="eyebrow">Progress</p>
             <h3 id="progressName"></h3>
           </div>
-          <button type="button" class="btn-ghost" id="progressClose">Close</button>
+          <div class="person-actions">
+            <button type="button" class="btn-ghost" id="progressTraining">See their training</button>
+            <button type="button" class="btn-ghost" id="progressClose">Close</button>
+          </div>
         </div>
         <div class="team-stats" id="progressSummary"></div>
         <div class="history-wrap" style="margin-top:16px;">
           <table class="history-table progress-table">
-            <thead><tr><th>Date</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Mean speed</th></tr></thead>
+            <thead><tr><th>Date</th><th>Exercise</th><th>Load</th><th>Reps</th><th>Mean speed</th><th>Fastest rep</th></tr></thead>
             <tbody id="progressRows"></tbody>
           </table>
         </div>
@@ -698,8 +776,15 @@
 <script src="js/core.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/sensors.js"></script>
+<script src="js/exercises.js"></script>
 <script src="js/plans.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/team.js"></script>
+<script src="js/mysets.js"></script>
+<script src="js/coachplans.js"></script>
+<script src="js/recorder.js"></script>
+<script src="js/recordings.js"></script>
+<script src="js/vbt.js"></script>
+<script src="js/training.js"></script>
 <script src="js/app.js"></script>
 </body></html>

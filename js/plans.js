@@ -77,9 +77,28 @@ function describeTempo(t, liftKey) {
   return out.join(" · ");
 }
 
+// Time units a coach might write, in English, Icelandic and Swedish.
+var DURATION_UNIT = "(s|secs?|seconds?|sek|sekúndur|sekunder|min|mins|minutes?|mín|mínútur|minuter|h|hrs?|hours?|klst|tim(?:mar)?)";
+
+function durationSeconds(value, unit) {
+  var v = parseFloat(String(value).replace(",", "."));
+  var u = unit.toLowerCase();
+  if (/^(h|hrs?|hours?|klst|tim|timmar)$/.test(u)) return Math.round(v * 3600);
+  if (/^(min|mins|minutes?|mín|mínútur|minuter)$/.test(u)) return Math.round(v * 60);
+  return Math.round(v);
+}
+
+// 45 -> "45 s", 1200 -> "20 min", 5400 -> "1 h 30 min"
+function formatDuration(sec) {
+  if (sec == null) return "";
+  if (sec < 120 && sec % 60 !== 0) return sec + " s";
+  var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  return (h ? h + " h" + (m ? " " : "") : "") + (m ? m + " min" : "");
+}
+
 function parseExerciseLine(raw) {
   var item = {
-    raw: raw, name: "", lift: null, sets: null, reps: null, repsText: "",
+    raw: raw, name: "", lift: null, sets: null, reps: null, repsText: "", duration: null, zone: null,
     load: null, tempo: null, velocity: null, velocityLoss: null, note: "", warnings: []
   };
   var rest = " " + raw.replace(/^\s*[-*•]\s+/, "").trim() + " ";
@@ -117,6 +136,14 @@ function parseExerciseLine(raw) {
     item.velocity = { min: parseFloat(m[1]), max: m[2] ? parseFloat(m[2]) : null };
   });
 
+  // 3b. training zone the coach wants the sets in — velocity-based planning:
+  // "Back squat 5x3 strength-speed", "zone: accelerative strength".
+  take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
+    var z = fold(m[1]);
+    item.zone = /^speed/.test(z) ? "Speed–strength" : /^strength/.test(z) ? "Strength–speed"
+      : /^accel/.test(z) ? "Accelerative strength" : "Maximal strength";
+  });
+
   // 4. load — percentage and RPE before any bare "@140", which is kilos
   take(/(?:^|\s)@?\s*(\d{1,3}(?:\.\d+)?)\s*%/, function (m) {
     item.load = { kind: "pct", value: parseFloat(m[1]) };
@@ -140,10 +167,12 @@ function parseExerciseLine(raw) {
   }
 
   // 5. sets and reps. Time-based work is tried before the plain NxM form,
-  // otherwise "3x30sek" reads as thirty reps and loses the unit.
-  var gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,3})\s*(sek|sec|mín|min)\b/i, function (m) {
+  // otherwise "3x30sek" reads as thirty reps and loses the unit. item.duration
+  // is the time per set in seconds ("3x45s", "Bike 20 min", "Walk 1 h").
+  var gotScheme = take(new RegExp("(?:^|\\s)(\\d{1,2})\\s*[x×*]\\s*(\\d{1,3})\\s*" + DURATION_UNIT + "(?=\\s|$)", "i"), function (m) {
     item.sets = parseInt(m[1], 10);
-    item.repsText = m[2] + " " + m[3].toLowerCase();
+    item.duration = durationSeconds(m[2], m[3]);
+    item.repsText = formatDuration(item.duration);
   });
   if (!gotScheme) gotScheme = take(/(?:^|\s)(\d{1,2})\s*[x×*]\s*(\d{1,2})(?:\s*[-–]\s*(\d{1,2}))?(?=\s|$)/i, function (m) {
     item.sets = parseInt(m[1], 10);
@@ -151,7 +180,8 @@ function parseExerciseLine(raw) {
     item.repsText = m[3] ? m[2] + "–" + m[3] : m[2];
   });
   if (!gotScheme) {
-    gotScheme = take(/(?:^|\s)(\d{1,2})\s*sets?\s*(?:of|x)?\s*(\d{1,2})(?=\s|$)/i, function (m) {
+    // (not when a time unit follows: "3 sets 30 s" is timed, handled below)
+    gotScheme = take(/(?:^|\s)(\d{1,2})\s*sets?\s*(?:of|x)?\s*(\d{1,2})(?=\s|$)(?!\s*(?:s|secs?|seconds?|sek|min|mins|minutes?|mín|h)(?:\s|$))/i, function (m) {
       item.sets = parseInt(m[1], 10);
       item.reps = parseInt(m[2], 10);
       item.repsText = m[2];
@@ -196,6 +226,15 @@ function parseExerciseLine(raw) {
       item.repsText = m[1] + "RM";
     });
   }
+  // A duration on its own is one timed bout: "Bike 20 min", "Walk 1 h". Last
+  // resort, so "3x2 2s pause" stays three sets of two.
+  if (!gotScheme) gotScheme = take(new RegExp("(?:^|\\s)(\\d{1,3}(?:[.,]\\d)?)\\s*" + DURATION_UNIT + "(?=\\s|$)", "i"), function (m) {
+    item.sets = 1;
+    item.duration = durationSeconds(m[1], m[2]);
+    item.repsText = formatDuration(item.duration);
+    // "Plank 3 sets 30 s": the count still applies.
+    take(/(?:^|\s)(\d{1,2})\s*(sett|sets?|rounds?|hringir)(?:\s+of|\s+af)?\b/i, function (c) { item.sets = parseInt(c[1], 10); });
+  });
   // Counts with no partner: "3 sett", "2 hringir", "10 reps".
   if (!gotScheme) {
     gotScheme = take(/(?:^|\s)(\d{1,2})\s*(sett|sets?)\b/i, function (m) {
@@ -221,7 +260,14 @@ function parseExerciseLine(raw) {
 
   item.name = rest.replace(/[\s,;:@-]+$/, "").replace(/^[\s,;:-]+/, "").replace(/\s+/g, " ").trim();
   if (!item.name) { item.warnings.push("no exercise name"); return null; }
-  item.lift = matchLift(item.name);
+  // The exercise bank (exercises.js) knows names in several languages and
+  // which lifts the sensors analyze. A name it doesn't know gets no analysis
+  // (item.lift stays null), even if it looks like a squat: "Zercher squat"
+  // isn't analyzed as a back squat.
+  var known = findExercise(item.name);
+  item.exerciseKey = known ? known.key : null;
+  var lift = known ? analyzedLift(known) : null;
+  item.lift = lift ? { key: lift, variant: ["back_squat", "bench_press", "deadlift"].indexOf(known.key) === -1 } : null;
   return item;
 }
 
@@ -238,6 +284,7 @@ var HEADER_ALIASES = {
   tempo: ["tempo", "taktur"],
   velocity: ["target velocity", "velocity", "target vel", "vel", "m s", "hradi", "malhradi"],
   velocity_loss: ["velocity loss", "vl", "vel loss", "loss", "hradatap"],
+  zone: ["zone", "training zone", "vbt zone", "svaedi", "zon"],
   notes: ["notes", "note", "comment", "comments", "athugasemdir", "athugasemd", "minnispunktar", "kommentar"],
   week: ["week", "wk", "vika", "vecka"],
   day: ["day", "session", "pass", "dag", "dagur", "lota"]
@@ -262,7 +309,7 @@ function exerciseLike(text) {
   var first = String(text || "").trim().split(/\n/)[0];
   if (!first) return false;
   var item = parseExerciseLine(first);
-  return !!(item && (item.sets !== null || item.load !== null || item.tempo !== null));
+  return !!(item && (item.sets !== null || item.load !== null || item.tempo !== null || item.zone !== null));
 }
 
 function cellText(row, i) { return i === undefined ? "" : String(row[i] === undefined ? "" : row[i]).trim(); }
@@ -303,6 +350,8 @@ function prescriptionLine(row, m, name) {
   if (tempo) parts.push("[" + tempo + "]");
   var vel = cleanCell(cellText(row, m.velocity));
   if (vel) parts.push(/m\s*\/\s*s/i.test(vel) ? vel : vel + " m/s");
+  var zone = cleanCell(cellText(row, m.zone));
+  if (zone) parts.push("zone: " + zone);
   var vloss = cleanCell(cellText(row, m.velocity_loss));
   if (vloss) parts.push("VL" + vloss.replace(/[^\d]/g, "") + "%");
   var note = cleanCell(cellText(row, m.notes));
@@ -653,7 +702,7 @@ function parsePlan(text) {
 
     var item = parseExerciseLine(t);
     if (!item) { plan.unparsed.push({ line: t, reason: "no exercise name left after reading the numbers" }); continue; }
-    if (item.sets === null && item.load === null && item.tempo === null) {
+    if (item.sets === null && item.load === null && item.tempo === null && item.zone === null) {
       plan.unparsed.push({ line: t, reason: "no sets, load or tempo found — read as prose, not an exercise" });
       continue;
     }
@@ -1278,7 +1327,7 @@ function renderPlanItem(item) {
   var bits = [];
   if (item.sets) {
     var reps = item.repsText || (item.reps == null ? "" : String(item.reps));
-    bits.push(reps ? item.sets + " × " + reps : item.sets + " sets");
+    bits.push(item.duration != null && item.sets === 1 ? reps : reps ? item.sets + " × " + reps : item.sets + " sets");
   }
   var lt = loadText(item);
   if (lt) bits.push(lt);
@@ -1302,6 +1351,11 @@ function renderPlanItem(item) {
       line += " · " + zoneFor(zex, item.velocity.max || item.velocity.min);
     }
     wrap.appendChild(el("p", "plan-item-vbt", line));
+  }
+  if (item.zone) {
+    var zr = item.lift ? zoneRange(EXERCISES[item.lift.key], item.zone) : null;
+    wrap.appendChild(el("p", "plan-item-vbt", "Zone: " + item.zone +
+      (zr ? " · aim " + zr.lo.toFixed(2) + "–" + zr.hi.toFixed(2) + " m/s; the weight is suggested from the athlete's own sets" : "")));
   }
   if (item.velocityLoss != null) {
     wrap.appendChild(el("p", "plan-item-vbt",
@@ -1363,6 +1417,7 @@ var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
 // The zone a prescribed item lands in — from the coach's own velocity target
 // where there is one, otherwise from the load.
 function itemZone(item) {
+  if (item.zone) return item.zone;
   if (!item.lift) return null;
   var ex = EXERCISES[item.lift.key];
   if (item.velocity) return zoneFor(ex, item.velocity.max || item.velocity.min);
@@ -1477,9 +1532,13 @@ function renderPlan(plan) {
     (plan.unparsed.length ? ", skipped " + plan.unparsed.length + " line(s)." : ".");
 }
 
+// The plan as last read from the text box, for saving it to the team (coachplans.js).
+var currentPlan = null;
+
 function runPlanParse(save) {
   var text = document.getElementById("planText").value;
   var plan = parsePlan(text);
+  currentPlan = plan;
   var nameInput = document.getElementById("planName");
   if (plan.title && !nameInput.value.trim()) nameInput.value = plan.title;
   renderPlan(plan);
@@ -1537,6 +1596,7 @@ var PLAN_SAMPLE = [
     textEl.value = "";
     document.getElementById("planName").value = "";
     try { localStorage.removeItem(PLAN_KEY); } catch (e) { /* nothing to clear */ }
+    if (typeof closeTeamPlan === "function") closeTeamPlan();
     runPlanParse(false);
   });
 

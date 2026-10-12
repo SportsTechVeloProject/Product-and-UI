@@ -100,7 +100,37 @@ function niceAbsMax(v, step) {
   return Math.max(step, Math.ceil((v * 1.2) / step) * step);
 }
 
+/* ---------------- chart placeholder ---------------- */
+var NOT_MEASURED = "Not measured yet: bar path isn't calculated from the sensors so far.";
+// Replaces a chart with a one-line note, for recorded sets that lack the data.
+function renderChartMessage(svgId, text) {
+  var svg = document.getElementById(svgId);
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.__getLines = null; // no hover tooltip on an empty chart
+  var msg = svgEl("text", { x: W / 2, y: H / 2, "text-anchor": "middle", class: "mono", "font-size": 11, fill: "var(--muted)" });
+  msg.textContent = text;
+  svg.appendChild(msg);
+}
+
 /* ---------------- render: velocity-by-cycle chart ---------------- */
+// One rep's speed curve. A recorded set is scaled so the curve tops out at
+// the rep's measured top speed; the demo uses the curve as it comes.
+function repCurve(sim, i) {
+  var pts = velocityCurve(sim.velocities[i]);
+  var peak = sim.peaks && sim.peaks[i];
+  if (!peak) return pts;
+  var top = Math.max.apply(null, pts.map(function (pt) { return pt.v; }));
+  return pts.map(function (pt) { return { p: pt.p, v: pt.v * peak / top }; });
+}
+function repUneven(sim, i) {
+  return !!(sim.left && isUneven(sim.left[i], sim.right[i]));
+}
+
+// Each rep is coloured by the training zone of its mean speed, with a dot at
+// its top speed. The fastest rep (highest mean speed) is drawn thickest, on
+// top, with a label. (Uneven left/right reps are shown in the left vs right
+// chart, not here.)
 function renderVelocityChart(ex, sim, target, selectedRep) {
   target = target || { svg: "velChart", legend: "velLegend" };
   if (selectedRep === undefined) selectedRep = null;
@@ -108,20 +138,31 @@ function renderVelocityChart(ex, sim, target, selectedRep) {
   svg.innerHTML = "";
   svg.setAttribute("viewBox", "0 0 " + W + " " + H);
 
-  var yMax = niceMax(Math.max.apply(null, sim.velocities.map(function (v) { return v * 1.25; })));
+  var n = sim.velocities.length;
+  var curves = sim.velocities.map(function (_, i) { return repCurve(sim, i); });
+  var tops = curves.map(function (pts) { return pts.reduce(function (a, b) { return b.v > a.v ? b : a; }); });
+  var yMax = niceMax(Math.max.apply(null, tops.map(function (t) { return t.v; })) * 1.05); // room for the label
   var yS = makeYScale(yMax);
   var yTicks = [0, 0.25, 0.5, 0.75, 1].map(function (f) { return { v: +(yMax * f).toFixed(2), y: yS(yMax * f) }; });
   drawAxes(svg, ex.cycleLabels, yTicks, function (v) { return v.toFixed(2); });
 
-  var n = sim.velocities.length;
+  var fastest = sim.velocities.indexOf(Math.max.apply(null, sim.velocities));
   var indices = selectedRep === null ? sim.velocities.map(function (_, i) { return i; }) : [clamp(selectedRep, 0, n - 1)];
-  var seriesPts = indices.map(function (i) { return { i: i, pts: velocityCurve(sim.velocities[i]) }; });
+  var seriesPts = indices.map(function (i) { return { i: i, pts: curves[i] }; });
+  seriesPts.sort(function (a, b) { return (a.i === fastest) - (b.i === fastest); }); // fastest on top
   seriesPts.forEach(function (s) {
-    var fade = selectedRep === null ? (n === 1 ? 1 : 1 - (s.i / (n - 1)) * 0.65) : 1;
-    var strokeWidth = selectedRep === null ? 2.2 : 2.6;
-    var d = pathFromPoints(s.pts, xScale, yS);
-    var path = svgEl("path", { d: d, fill: "none", stroke: "var(--accent)", "stroke-width": strokeWidth, "stroke-linecap": "round", opacity: fade.toFixed(2) });
-    svg.appendChild(path);
+    var isFastest = s.i === fastest;
+    var color = zoneColor(ex, sim.velocities[s.i]);
+    var strokeWidth = (selectedRep === null ? 2 : 2.6) + (isFastest ? 1.4 : 0);
+    var attrs = { d: pathFromPoints(s.pts, xScale, yS), fill: "none", stroke: color, "stroke-width": strokeWidth, "stroke-linecap": "round", opacity: isFastest || selectedRep !== null ? 1 : 0.8 };
+    svg.appendChild(svgEl("path", attrs));
+    var top = tops[s.i];
+    svg.appendChild(svgEl("circle", { cx: xScale(top.p), cy: yS(top.v), r: isFastest ? 4.5 : 3.5, fill: color, stroke: "var(--surface)", "stroke-width": 1.5 }));
+    if (isFastest) {
+      var label = svgEl("text", { x: xScale(top.p), y: yS(top.v) - 10, "text-anchor": "middle", class: "mono", "font-size": 10, fill: "var(--fg)" });
+      label.textContent = "Fastest: rep " + (s.i + 1) + " · mean " + sim.velocities[s.i].toFixed(2) + " · top " + top.v.toFixed(2) + " m/s";
+      svg.appendChild(label);
+    }
   });
 
   // y axis title (top-right, clear of the tick labels)
@@ -129,23 +170,29 @@ function renderVelocityChart(ex, sim, target, selectedRep) {
   yt.textContent = "m/s";
   svg.appendChild(yt);
 
-  // legend: sequential fade, rep 1 -> rep n (only meaningful when showing all reps)
+  // legend: the zones this set's reps fall in, plus what the dots mean
   var legend = document.getElementById(target.legend);
   if (legend) {
     legend.innerHTML = "";
     if (selectedRep === null) {
-      var l1 = document.createElement("span");
-      l1.innerHTML = '<i style="background:var(--accent)"></i>Rep 1';
-      var l2 = document.createElement("span");
-      l2.innerHTML = '<i style="background:var(--accent); opacity:.4"></i>Rep ' + n;
-      legend.appendChild(l1); legend.appendChild(l2);
+      ex.zones.forEach(function (z, zi) {
+        var inSet = sim.velocities.some(function (v) { return zoneFor(ex, v) === z.label; });
+        if (!inSet) return;
+        var item = document.createElement("span");
+        item.innerHTML = '<i style="background:var(--zone-' + (zi + 1) + ')"></i>' + z.label;
+        legend.appendChild(item);
+      });
+      var dot = document.createElement("span");
+      dot.textContent = "● top speed";
+      legend.appendChild(dot);
     }
   }
 
   attachHover(svg, "vel-tt", function (phase) {
-    return seriesPts.map(function (s) {
+    return seriesPts.slice().sort(function (a, b) { return a.i - b.i; }).map(function (s) {
       var pt = nearestPoint(s.pts, phase);
-      return "Rep " + (s.i + 1) + ": " + pt.v.toFixed(2) + " m/s";
+      return "Rep " + (s.i + 1) + ": " + pt.v.toFixed(2) + " m/s · top " + tops[s.i].v.toFixed(2) +
+        (s.i === fastest ? " · fastest" : "");
     });
   });
 }
@@ -216,6 +263,67 @@ function renderPathChart(ex, sim, target) {
   }
   var svg = document.getElementById(target.svg);
   drawPathCurves(svg, ex, sim, currentPathRep);
+}
+
+/* ---------------- render: left vs right speed per rep (recorded sets) ---------------- */
+// Recorded sets don't have a bar path yet, but they do have each sleeve's
+// mean speed per rep. One column per rep: left and right dots joined by a
+// line; reps over LR_MISMATCH_LIMIT are shaded and labelled.
+var LR_SPEED_TITLE = "Left vs right — speed per rep";
+function renderLRSpeedChart(sim, svgId, selectedRep) {
+  if (selectedRep === undefined) selectedRep = null;
+  var svg = document.getElementById(svgId);
+  svg.innerHTML = "";
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+
+  var n = sim.velocities.length;
+  var all = sim.left.concat(sim.right).filter(function (v) { return v !== null; }).map(Number);
+  var yMax = niceMax(Math.max.apply(null, all));
+  var yS = makeYScale(yMax);
+  [0, 0.25, 0.5, 0.75, 1].forEach(function (f) {
+    var y = yS(yMax * f);
+    svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: y, y2: y, stroke: "var(--chart-grid)", "stroke-width": 1 }));
+    var lbl = svgEl("text", { x: M.l - 10, y: y + 3, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    lbl.textContent = (yMax * f).toFixed(2);
+    svg.appendChild(lbl);
+  });
+  svg.appendChild(svgEl("line", { x1: M.l, x2: W - M.r, y1: H - M.b, y2: H - M.b, stroke: "var(--rule)", "stroke-width": 1 }));
+
+  var colW = (W - M.l - M.r) / n;
+  function xRep(i) { return M.l + (i + 0.5) * colW; }
+  for (var i = 0; i < n; i++) {
+    var x = xRep(i);
+    var dim = selectedRep !== null && selectedRep !== i ? 0.3 : 1;
+    var l = sim.left[i], r = sim.right[i];
+    if (repUneven(sim, i)) {
+      svg.appendChild(svgEl("rect", { x: x - colW * 0.4, y: M.t, width: colW * 0.8, height: H - M.t - M.b, fill: "var(--warn)", opacity: 0.12 * dim }));
+      // Below the "m/s" title, and pulled in from the edges so it never clips.
+      var warn = svgEl("text", { x: clamp(x, M.l + 28, W - M.r - 28), y: M.t + 22, "text-anchor": "middle", class: "mono", "font-size": 9, fill: "var(--warn)", opacity: dim });
+      warn.textContent = Math.round(lrMismatch(l, r) * 100) + "% apart";
+      svg.appendChild(warn);
+    }
+    if (l !== null && r !== null) {
+      svg.appendChild(svgEl("line", { x1: x, x2: x, y1: yS(Number(l)), y2: yS(Number(r)), stroke: "var(--muted)", "stroke-width": 1.5, opacity: dim }));
+    }
+    if (l !== null) svg.appendChild(svgEl("circle", { cx: x, cy: yS(Number(l)), r: 4.5, fill: "var(--chart-left)", opacity: dim }));
+    if (r !== null) svg.appendChild(svgEl("circle", { cx: x, cy: yS(Number(r)), r: 4.5, fill: "var(--chart-right)", opacity: dim }));
+    var rn = svgEl("text", { x: x, y: H - 12, "text-anchor": "middle", class: "mono", "font-size": 9, fill: "var(--muted)" });
+    rn.textContent = String(i + 1);
+    svg.appendChild(rn);
+  }
+  var xt = svgEl("text", { x: M.l, y: H - 12, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+  xt.textContent = "rep ";
+  svg.appendChild(xt);
+  var yt = svgEl("text", { x: W - M.r, y: M.t + 4, "text-anchor": "end", class: "mono", "font-size": 9, fill: "var(--muted)" });
+  yt.textContent = "m/s";
+  svg.appendChild(yt);
+
+  attachHover(svg, "lr-tt", function (phase) {
+    var i = clamp(Math.floor(phase / 100 * n), 0, n - 1);
+    var l = sim.left[i], r = sim.right[i], m = lrMismatch(l, r);
+    return ["Rep " + (i + 1) + ": left " + (l === null ? "—" : Number(l).toFixed(2)) + " · right " + (r === null ? "—" : Number(r).toFixed(2)) + " m/s" +
+      (m === null ? "" : " · " + Math.round(m * 100) + "% apart" + (repUneven(sim, i) ? " (uneven)" : ""))];
+  });
 }
 
 /* ---------------- render: front/back drift chart ---------------- */
@@ -300,6 +408,7 @@ function attachHover(svg, ttId, getLines) {
   svg.dataset.hoverBound = "1";
 
   function move(evt) {
+    if (!svg.__getLines) return;
     var ch = svg.__crosshair;
     var rect = svg.getBoundingClientRect();
     var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
@@ -330,14 +439,40 @@ function renderRepZones(ex, sim) {
   sim.velocities.forEach(function (v, i) {
     var chip = document.createElement("div");
     chip.className = "rep-chip";
+    chip.style.borderLeftColor = zoneColor(ex, v);
     chip.innerHTML =
       '<span class="rn">Rep ' + (i + 1) + '</span>' +
       '<span class="rv">' + v.toFixed(2) + ' m/s</span>' +
-      '<button type="button" class="rz zone-link" data-zone="' + zoneFor(ex, v) + '">' + zoneFor(ex, v) + '</button>';
+      '<button type="button" class="rz zone-link" data-zone="' + zoneFor(ex, v) + '">' + zoneFor(ex, v) + '</button>' +
+      (repUneven(sim, i)
+        ? '<span class="rep-flag" title="Left ' + Number(sim.left[i]).toFixed(2) + ' m/s · right ' + Number(sim.right[i]).toFixed(2) + ' m/s">Uneven left/right</span>'
+        : "");
     wrap.appendChild(chip);
   });
   var summary = document.getElementById("setSummary");
-  summary.textContent = sim.pct.toFixed(0) + "% e1RM · " + sim.lossPct.toFixed(0) + "% velocity loss across the set";
+  if (!sim.reps) {
+    summary.textContent = "No reps calculated for this set yet";
+  } else {
+    // Recorded sets have no 1RM to compare against yet.
+    summary.textContent = (sim.real ? "Measured" : sim.pct.toFixed(0) + "% e1RM") +
+      " · " + sim.lossPct.toFixed(0) + "% velocity loss across the set";
+  }
+}
+
+// One line on how left and right compare across a recorded set's reps.
+function lrCheckSummary(sim) {
+  if (!sim.left || !sim.reps) return "";
+  var limit = Math.round(LR_MISMATCH_LIMIT * 100) + "%";
+  var flagged = [];
+  sim.velocities.forEach(function (_, i) {
+    if (repUneven(sim, i)) {
+      flagged.push("rep " + (i + 1) + " (left " + Number(sim.left[i]).toFixed(2) + ", right " + Number(sim.right[i]).toFixed(2) +
+        " m/s, " + Math.round(lrMismatch(sim.left[i], sim.right[i]) * 100) + "% apart)");
+    }
+  });
+  return flagged.length
+    ? "Left vs right speed check: " + flagged.join("; ") + (flagged.length === 1 ? " is" : " are") + " uneven. A rep is flagged when the sides differ by more than " + limit + "."
+    : "Left vs right speed check: every rep is within " + limit + " between the sides.";
 }
 
 /* ---------------- history table ---------------- */
@@ -345,15 +480,17 @@ function renderHistory(exKey, ex, selectedIdx) {
   var body = document.getElementById("historyBody");
   body.innerHTML = "";
   ex.history.forEach(function (row, idx) {
-    var sim = simulateSet(row.weight, ex);
+    var sim = setData(ex, row);
+    var v1 = sim.velocities[0];
+    var zone = v1 === undefined ? null : zoneFor(ex, v1);
     var tr = document.createElement("tr");
     tr.setAttribute("aria-current", idx === selectedIdx ? "true" : "false");
     tr.innerHTML =
       "<td>" + row.date + (row.time ? ' <span class="muted-small">' + row.time + "</span>" : "") + "</td>" +
-      '<td class="num">' + row.weight + " kg</td>" +
+      '<td class="num">' + (row.weight === null ? "—" : row.weight + " kg") + "</td>" +
       '<td class="num">' + sim.reps + "</td>" +
-      '<td class="num">' + sim.velocities[0].toFixed(2) + " m/s</td>" +
-      '<td><button type="button" class="zone-link" data-zone="' + zoneFor(ex, sim.velocities[0]) + '">' + zoneFor(ex, sim.velocities[0]) + "</button></td>";
+      '<td class="num">' + (v1 === undefined ? "—" : v1.toFixed(2) + " m/s") + "</td>" +
+      "<td>" + (zone ? '<button type="button" class="zone-link" data-zone="' + zone + '">' + zone + "</button>" : "—") + "</td>";
     tr.addEventListener("click", function () { selectSet(exKey, idx); });
     body.appendChild(tr);
   });

@@ -15,6 +15,12 @@
     --chart-right: #B8860B;
     --chart-grid: #DFDACC;
     --good: #2E7D32;
+    /* Training zones, fastest to slowest (front-page table, bar speed chart, rep chips) */
+    --zone-1: #2247D6;
+    --zone-2: #1F8A7E;
+    --zone-3: #B8860B;
+    --zone-4: #B5532A;
+    --warn: #C0392B;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -33,6 +39,11 @@
       --chart-right: #A67C23;
       --chart-grid: #33363D;
       --good: #4CAF50;
+      --zone-1: #6C8CFF;
+      --zone-2: #4FC3B5;
+      --zone-3: #E8C158;
+      --zone-4: #EE8A62;
+      --warn: #FF7A6B;
     }
   }
   :root[data-theme="dark"] {
@@ -51,6 +62,11 @@
     --chart-right: #A67C23;
     --chart-grid: #33363D;
     --good: #4CAF50;
+    --zone-1: #6C8CFF;
+    --zone-2: #4FC3B5;
+    --zone-3: #E8C158;
+    --zone-4: #EE8A62;
+    --warn: #FF7A6B;
   }
 
   * { box-sizing: border-box; }
@@ -587,6 +603,17 @@
   .team-result .team-bio { font-size: 0.9rem; margin-top: 8px; }
   .invite-link-box { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
   .progress-table tbody tr { cursor: default; }
+  .progress-table tbody tr.progress-set { cursor: pointer; }
+  .progress-table tbody tr.progress-set[aria-expanded="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .progress-table tbody tr.progress-detail, .progress-table .rep-table tr { cursor: default; }
+  .progress-table tbody tr.progress-detail:hover, .progress-table .rep-table tr:hover { background: none; }
+  .progress-table tbody tr.progress-detail > td { padding: 4px 16px 16px; }
+  .rep-detail { display: flex; flex-direction: column; gap: 8px; }
+  .rep-table { border-collapse: collapse; width: auto; }
+  .progress-table .rep-table th, .progress-table .rep-table td { padding: 6px 18px 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; text-align: left; }
+  .progress-table .rep-table th { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .progress-table .rep-table td.num { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; }
+  .progress-table .rep-table tr:last-child td { border-bottom: none; }
 
   @media (max-width: 520px) {
     .stat-tile-wide { grid-column: auto; }
@@ -786,7 +813,10 @@
   }
   .rep-pill[aria-pressed="true"] { color: var(--accent-contrast); background: var(--accent); border-color: var(--accent); }
 
-  .rep-pill-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  /* Arrows stay either side of the pills; the pills wrap between them. */
+  .rep-pill-nav { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+  .rep-pill-nav .rep-pills { flex: 1 1 auto; min-width: 0; }
+  .rep-pill-nav .rep-pill-arrow { flex: none; }
   .rep-pill-arrow {
     display: inline-flex;
     align-items: center;
@@ -847,6 +877,7 @@
   .rep-chip .rn { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; font-family: 'IBM Plex Mono', monospace; }
   .rep-chip .rv { font-family: 'IBM Plex Mono', monospace; font-size: 1.05rem; }
   .rep-chip .rz { font-size: 0.76rem; }
+  .rep-chip .rep-flag, .rep-flag { font-size: 0.72rem; color: var(--warn); font-weight: 500; }
 
   .zone-link, .text-link {
     background: none;
@@ -975,6 +1006,165 @@
   /* ---- training plans ---- */
   #exerciseView, #plansView { display: flex; flex-direction: column; gap: 40px; }
   #exerciseView[hidden], #plansView[hidden] { display: none; }
+  .log-form[hidden], #exNotice[hidden] { display: none; }
+  .set-context { font-size: 0.88rem; color: var(--muted); margin: 0 0 14px; max-width: 72ch; }
+
+  /* ---- My training (training.js) ---- */
+  .plans-switch { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  .plans-switch[hidden], #trainingView[hidden], #planBuilderView[hidden], .training-layout[hidden], .training-pending[hidden] { display: none; }
+  .plans-switch button { border: none; background: none; padding: 8px 16px; border-radius: 4px; font: 500 0.92rem 'IBM Plex Sans', sans-serif; color: var(--muted); cursor: pointer; }
+  .plans-switch button[aria-selected="true"] { background: var(--accent); color: var(--accent-contrast); }
+  .training-hero-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .training-hero-actions[hidden], #freeWorkoutBtn[hidden] { display: none; }
+  .training-status:empty { display: none; }
+  .training-pending { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .training-layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; align-items: start; }
+  .training-side { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 16px; max-height: calc(100vh - 32px); min-width: 0; }
+  .training-list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; padding-right: 4px; min-height: 0; }
+  .training-cal { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 12px; }
+  .training-cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .training-cal-title { font-weight: 600; font-size: 0.92rem; text-transform: capitalize; }
+  .training-cal-nav { border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 3px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; line-height: 1; }
+  .training-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .training-cal-dow { font-family: 'IBM Plex Mono', monospace; font-size: 0.6rem; text-transform: uppercase; color: var(--muted); text-align: center; padding-bottom: 2px; }
+  .training-cal-day { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 0.76rem; color: var(--muted); border: 1px solid transparent; background: none; padding: 0; }
+  button.training-cal-day { cursor: pointer; color: var(--fg); font-weight: 600; }
+  button.training-cal-day.is-rest { color: var(--muted); font-weight: 400; }
+  button.training-cal-day.is-rest:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+  .training-cal-day.status-done { background: color-mix(in srgb, var(--good) 22%, transparent); }
+  .training-cal-day.status-upcoming, .training-cal-day.status-today { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .training-cal-day.status-missed { background: color-mix(in srgb, var(--warn) 16%, transparent); }
+  .training-cal-day.is-today { border-color: var(--accent); }
+  .training-cal-day[aria-current="true"] { box-shadow: 0 0 0 2px var(--accent); }
+  .training-cal-count { position: absolute; top: 1px; right: 3px; font-size: 0.55rem; color: var(--muted); }
+  .training-cal-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.72rem; color: var(--muted); margin: 8px 0 0; }
+  .training-cal-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .training-cal-key { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .training-cal-key.status-done { background: color-mix(in srgb, var(--good) 45%, transparent); }
+  .training-cal-key.status-upcoming { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+  .training-cal-key.status-missed { background: color-mix(in srgb, var(--warn) 35%, transparent); }
+  .training-timer { font-family: 'IBM Plex Mono', monospace; font-size: 0.95rem; align-self: center; color: var(--muted); }
+  .training-timer.is-running { color: var(--accent); font-weight: 600; font-size: 1.15rem; }
+  .training-group { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 14px 0 4px; }
+  .training-group:first-child { margin-top: 0; }
+  .training-item {
+    display: grid; grid-template-columns: 1fr auto; grid-template-areas: "date pill" "label pill";
+    gap: 0 8px; text-align: left; padding: 9px 12px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface); color: var(--fg); cursor: pointer; font: inherit;
+  }
+  .training-item:hover { border-color: var(--muted); }
+  .training-item[aria-current="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+  .training-item-date { grid-area: date; font-family: 'IBM Plex Mono', monospace; font-size: 0.74rem; color: var(--muted); }
+  .training-item-label { grid-area: label; font-weight: 500; font-size: 0.9rem; }
+  .training-item.status-missed .training-item-label { color: var(--muted); }
+  .training-pill { grid-area: pill; align-self: center; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; border: 1px solid currentColor; }
+  .training-pill.done { color: var(--good); }
+  .training-pill.today { color: var(--accent); }
+  .training-pill.missed { color: var(--warn); }
+
+  .training-day { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .training-day-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .training-day-head h3 { font-size: 1.35rem; text-transform: none; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; margin: 4px 0; }
+  .training-day-meta { font-size: 0.88rem; color: var(--muted); margin: 0; }
+  .training-day-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .training-ex { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+  .training-ex.is-tracked { border-left: 3px solid var(--accent); }
+  .training-ex-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .training-ex-name { font-weight: 600; font-size: 1.02rem; }
+  .training-ex-target { font-family: 'IBM Plex Mono', monospace; font-size: 0.86rem; }
+  .training-tag { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.04em; padding: 2px 8px; border-radius: 10px; border: 1px solid currentColor; }
+  .training-tag.movesense { color: var(--accent); }
+  .training-tag.movesense.soon { color: var(--muted); border-style: dashed; }
+  .training-tag.manual { color: var(--muted); }
+  .training-sensor-hint { font-size: 0.82rem; color: var(--muted); margin: 0; }
+  .training-sensor-hint.is-ready { color: var(--accent); }
+  .training-last { font-size: 0.84rem; margin: 0; }
+  .training-zone { font-size: 0.86rem; margin: 0; color: var(--good); font-weight: 500; }
+  .training-suggest { font-size: 0.86rem; margin: 0; padding: 6px 10px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .training-set-wrap .training-suggest { margin: 2px 0 6px 54px; }
+  .training-suggest.next-up, .training-suggest.next-down { background: color-mix(in srgb, var(--zone-3) 14%, transparent); }
+  .training-suggest.next-hold { background: color-mix(in srgb, var(--good) 12%, transparent); }
+  .training-suggest.next-stop { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
+  .training-sets { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+  .training-set { display: grid; grid-template-columns: 44px 112px 112px minmax(0, 1fr); gap: 10px; align-items: center; }
+  .training-set-head span { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .training-set-no { font-family: 'IBM Plex Mono', monospace; color: var(--muted); }
+  .training-set input {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--bg); color: var(--fg); font: 0.92rem 'IBM Plex Mono', monospace;
+  }
+  .training-set input:disabled { opacity: 0.75; }
+  .training-set.is-done .training-set-no { color: var(--good); }
+  .training-set-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .training-set-controls .btn, .training-set-controls .btn-ghost { padding: 7px 14px; font-size: 0.86rem; margin: 0; }
+  .training-done.is-done { color: var(--good); border-color: var(--good); }
+  .training-record { color: var(--warn); border-color: var(--warn); }
+  .training-stop { background: var(--warn); border-color: var(--warn); }
+  .training-rec-live, .training-set-state { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; color: var(--muted); }
+  .training-rec-live { color: var(--warn); font-size: 1.3rem; font-weight: 600; min-width: 4ch; }
+  .training-set.is-recording { background: color-mix(in srgb, var(--warn) 10%, transparent); box-shadow: 0 0 0 2px var(--warn); border-radius: 4px; padding: 6px 0; }
+  .training-set-controls .training-record { background: var(--warn); border-color: var(--warn); color: #fff; font-weight: 600; }
+  .training-set-controls .training-stop { padding: 9px 18px; font-weight: 600; color: #fff; }
+  .training-tag-wrap { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+  .training-tag-wrap .training-tag { margin-left: 0; }
+
+  /* ⓘ: explanation on hover, focus or tap */
+  .info-tip {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--muted); background: none;
+    color: var(--muted); font: italic 600 0.68rem Georgia, serif; cursor: help; padding: 0; vertical-align: middle; margin-left: 4px;
+  }
+  .info-tip:hover, .info-tip:focus-visible { color: var(--accent); border-color: var(--accent); }
+  .info-tip::after {
+    content: attr(data-tip); position: absolute; z-index: 20; bottom: calc(100% + 8px); right: -8px; width: 280px;
+    padding: 10px 12px; border-radius: 4px; background: var(--fg); color: var(--bg);
+    font: normal 400 0.8rem/1.45 'IBM Plex Sans', sans-serif; text-align: left; white-space: normal;
+    opacity: 0; pointer-events: none; transform: translateY(4px); transition: opacity 0.12s, transform 0.12s;
+  }
+  .info-tip:hover::after, .info-tip:focus::after { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .info-tip::after { transition: none; } }
+
+  #sensorBar.is-flashing { animation: sensor-flash 1.6s ease-out; }
+  @keyframes sensor-flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+  @media (prefers-reduced-motion: reduce) { #sensorBar.is-flashing { animation: none; box-shadow: 0 0 0 3px var(--accent); } }
+  .training-rec { margin: 0 0 4px 54px; font-size: 0.82rem; }
+  .training-rec.pending { color: var(--muted); }
+  .training-rec.done { color: var(--fg); }
+  .training-rec.error { color: var(--warn); }
+  .training-add { align-self: flex-start; padding: 6px 12px; font-size: 0.84rem; margin: 0; }
+  .training-add-ex { display: flex; gap: 8px; flex-wrap: wrap; }
+  .training-add-ex input { flex: 1 1 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--fg); font: inherit; }
+  #athleteProgress .person-actions { margin-left: 0; }
+
+  /* ---- coach: team plans and assigning (coachplans.js) ---- */
+  .coach-plans { margin-bottom: 24px; }
+  .coach-plans[hidden], .assign-panel[hidden], .assign-current-title[hidden] { display: none; }
+  .coach-plans .person-row.is-open { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .coach-plan-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .assign-panel { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+  .assign-panel h4 { font-size: 0.98rem; font-family: 'IBM Plex Sans', sans-serif; text-transform: none; font-weight: 600; margin: 0; }
+  .assign-grid { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: flex-end; }
+  .assign-field { display: flex; flex-direction: column; gap: 6px; }
+  .assign-field > span { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .weekday-picks { display: flex; gap: 6px; flex-wrap: wrap; }
+  .weekday-pick { display: inline-flex; }
+  .weekday-pick input { position: absolute; opacity: 0; pointer-events: none; }
+  .weekday-pick span {
+    display: inline-block; min-width: 48px; text-align: center; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 3px; background: var(--bg);
+    font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; cursor: pointer; user-select: none;
+  }
+  .weekday-pick input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+  .weekday-pick input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .assign-problem { color: var(--warn); }
+  .assign-preview { display: flex; flex-direction: column; gap: 6px; }
+  .assign-week { display: flex; gap: 14px; align-items: baseline; font-size: 0.86rem; border-top: 1px solid var(--border); padding-top: 6px; }
+  .assign-week:first-child { border-top: none; padding-top: 0; }
+  .assign-week-label { min-width: 90px; font-weight: 600; }
+  .assign-week-days { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--muted); }
+  .assign-day { white-space: nowrap; }
+  .assign-current-title { margin-top: 6px !important; }
+  #assignConfirmBtn:disabled { opacity: 0.45; cursor: default; }
 
   .plan-intake { display: grid; grid-template-columns: minmax(260px, 0.8fr) 1.2fr; gap: 24px; align-items: stretch; }
   .plan-drop {

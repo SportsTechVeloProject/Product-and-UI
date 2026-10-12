@@ -106,6 +106,45 @@ function zoneRangeLabel(ex, idx) {
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+// Colour token for a speed's zone: --zone-1 (fastest zone) to --zone-4.
+function zoneColor(ex, v) {
+  for (var i = 0; i < ex.zones.length; i++) {
+    if (v >= ex.zones[i].min) return "var(--zone-" + (i + 1) + ")";
+  }
+  return "var(--zone-" + ex.zones.length + ")";
+}
+
+// The speed range of a training zone for a lift, { lo, hi, mid } in m/s, for
+// aiming a set's average speed. Zones are listed fastest first and the top
+// zone has no upper limit (nor the bottom one a lower), so those two get a
+// band of ZONE_OPEN_BAND for aiming. Zone limits live in EXERCISES above.
+var ZONE_OPEN_BAND = 0.2;
+function zoneRange(ex, label) {
+  var idx = -1;
+  ex.zones.forEach(function (z, i) { if (z.label === label) idx = i; });
+  if (idx === -1) return null;
+  var lo = ex.zones[idx].min;
+  var hi = idx === 0 ? lo + ZONE_OPEN_BAND : ex.zones[idx - 1].min;
+  if (lo === 0) lo = Math.max(0.05, hi - ZONE_OPEN_BAND);
+  return { lo: lo, hi: hi, mid: (lo + hi) / 2 };
+}
+
+// Uneven rep: left and right mean speeds differ by more than this share of
+// the rep's speed. 0.22 (22%) is a placeholder chosen so only the most uneven
+// rep in the first recorded set gets flagged; change it here once there's
+// enough clean data to pick a real threshold.
+var LR_MISMATCH_LIMIT = 0.22;
+// Share by which left and right differ (0.25 = 25%), or null without both sides.
+function lrMismatch(left, right) {
+  if (left === null || left === undefined || right === null || right === undefined) return null;
+  var mean = (Number(left) + Number(right)) / 2;
+  return mean > 0 ? Math.abs(Number(left) - Number(right)) / mean : null;
+}
+function isUneven(left, right) {
+  var m = lrMismatch(left, right);
+  return m !== null && m > LR_MISMATCH_LIMIT;
+}
+
 function zoneFor(ex, v) {
   for (var i = 0; i < ex.zones.length; i++) {
     if (v >= ex.zones[i].min) return ex.zones[i].label;
@@ -130,4 +169,11 @@ function simulateSet(weight, ex) {
     velocities.push(+(v1 - (v1 - vLast) * tc).toFixed(3));
   }
   return { pct: pct, v1: v1, reps: reps, velocities: velocities, lossPct: lossFraction * 100 };
+}
+
+// The numbers behind one history row. A recorded set brings its own
+// (row.sim, built from the database in mysets.js); demo rows are simulated
+// from their load.
+function setData(ex, row) {
+  return row.sim || simulateSet(row.weight, ex);
 }
