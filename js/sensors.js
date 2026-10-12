@@ -5,8 +5,12 @@
 /* ---------------- Movesense sensors over Web Bluetooth ---------------- */
 // Ported from SportsTechVeloProject/MoveSenseCode (Website/JS/ble.js and
 // simulate.js). Both transports expose the same four methods so the UI below
-// never branches on real-vs-simulated, and a sample is always
-// { sensor, device, t, recvAt, x, y, z } whichever one produced it.
+// never branches on real-vs-simulated. Two kinds of sample come out, whichever
+// transport produced them:
+//   { kind: "acc",  sensor, device, t, recvAt, x, y, z }      accelerometer, m/s²
+//   { kind: "gyro", sensor, device, t, recvAt, gx, gy, gz }   gyroscope, deg/s
+// The gyro is its own subscription (the route MoveSenseCode recorded the test
+// sets with); recorder.js matches the two up by timestamp when a set is saved.
 //
 // Web Bluetooth needs a secure context (https:// or localhost) and only
 // exists in Chromium browsers — no Safari, so no iPhone. Opening this file
@@ -20,8 +24,11 @@ var MSBle = (function () {
   var RESP_COMMAND_RESULT = 1;
   var RESP_DATA = 2;
   var REF_ACC = 99;
+  var REF_GYRO = 100;
   var RESOURCE_PATH = "/Meas/Acc";
+  var GYRO_RESOURCE_PATH = "/Meas/Gyro";
   var SAMPLE_RATE_HZ = 104;
+  var GYRO_SANITY_LIMIT_DPS = 2000; // catches a misparsed packet, nothing a barbell does
 
   var devices = {};
   // Labels mid-connect. Guards against overlapping gatt.connect() calls on
@@ -42,16 +49,27 @@ var MSBle = (function () {
     var response = value.getUint8(0);
     var reference = value.getUint8(1);
     if (response === RESP_COMMAND_RESULT) return;
-    if (response !== RESP_DATA || reference !== REF_ACC) return;
+    if (response !== RESP_DATA || (reference !== REF_ACC && reference !== REF_GYRO)) return;
 
+    // Both streams: uint32 timestamp, then N samples of three float32s.
     var timestampMs = value.getUint32(2, true);
     var numSamples = (value.byteLength - 6) / 12;
     var recvAt = Date.now();
     for (var i = 0; i < numSamples; i++) {
+      var t = timestampMs / 1000.0 + i / SAMPLE_RATE_HZ;
+      if (reference === REF_GYRO) {
+        var gx = value.getFloat32(6 + i * 12, true);
+        var gy = value.getFloat32(6 + i * 12 + 4, true);
+        var gz = value.getFloat32(6 + i * 12 + 8, true);
+        if (![gx, gy, gz].every(function (v) { return isFinite(v) && Math.abs(v) <= GYRO_SANITY_LIMIT_DPS; })) continue;
+        sampleHandler({ kind: "gyro", sensor: label, device: deviceName, t: t, recvAt: recvAt, gx: gx, gy: gy, gz: gz });
+        continue;
+      }
       sampleHandler({
+        kind: "acc",
         sensor: label,
         device: deviceName,
-        t: timestampMs / 1000.0 + i / SAMPLE_RATE_HZ,
+        t: t,
         recvAt: recvAt,
         x: value.getFloat32(6 + i * 12, true),
         y: value.getFloat32(6 + i * 12 + 4, true),
@@ -87,11 +105,15 @@ var MSBle = (function () {
         entry.dataChar.addEventListener("characteristicvaluechanged", function (event) {
           handleNotification(label, device.name, event);
         });
-        var resource = RESOURCE_PATH + "/" + SAMPLE_RATE_HZ;
-        var header = [CMD_SUBSCRIBE, REF_ACC];
-        var body = Array.from(new TextEncoder().encode(resource));
-        return entry.commandChar.writeValue(new Uint8Array(header.concat(body)));
-      });
+        return subscribe(entry, REF_ACC, RESOURCE_PATH);
+      })
+      .then(function () { return subscribe(entry, REF_GYRO, GYRO_RESOURCE_PATH); });
+  }
+
+  function subscribe(entry, reference, path) {
+    var header = [CMD_SUBSCRIBE, reference];
+    var body = Array.from(new TextEncoder().encode(path + "/" + SAMPLE_RATE_HZ));
+    return entry.commandChar.writeValue(new Uint8Array(header.concat(body)));
   }
 
   // One automatic retry: the "GATT operation already in progress" error the
@@ -166,46 +188,67 @@ var MSBle = (function () {
   };
 })();
 
+// Simulated sensors replay a real recorded set (DataTesting/11squats011026.json,
+// 11 back squats) in real time, looping, so recording and analysis can be
+// tried end to end without hardware. If that file can't be loaded it falls
+// back to a gentle made-up wobble.
 var MSSim = (function () {
   var TICK_MS = 50;
   var SAMPLE_RATE_HZ = 104;
+  var REPLAY_URL = "DataTesting/11squats011026.json";
   var sensors = {};
+  var replay = null; // { left: [rows], right: [rows] } once loaded
   var sampleHandler = function () {};
   var statusHandler = function () {};
+
+  function loadReplay() {
+    if (replay) return Promise.resolve(replay);
+    return fetch(REPLAY_URL).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (rows) {
+        var bySide = { left: [], right: [] };
+        rows.forEach(function (row) { if (bySide[row.sensor]) bySide[row.sensor].push(row); });
+        Object.keys(bySide).forEach(function (k) { bySide[k].sort(function (a, b) { return a.t - b.t; }); });
+        replay = bySide;
+        return replay;
+      })
+      .catch(function () { return null; });
+  }
+
+  function num(v) { var n = Number(v); return isFinite(n) ? n : 0; }
 
   function tick(label) {
     var entry = sensors[label];
     if (!entry) return;
     var samplesPerTick = Math.round((SAMPLE_RATE_HZ * TICK_MS) / 1000);
     var recvAt = Date.now();
+    var device = "Simulated " + label;
     function noise() { return (Math.random() - 0.5) * 0.3; }
     for (var i = 0; i < samplesPerTick; i++) {
       entry.sampleIndex += 1;
       var t = entry.sampleIndex / SAMPLE_RATE_HZ;
-      sampleHandler({
-        sensor: label,
-        device: "Simulated " + label,
-        t: t,
-        recvAt: recvAt,
-        x: Math.sin(t * 1.3 + entry.phase) * 1.5 + noise(),
-        y: noise(),
-        z: 9.8 + noise()
-      });
+      var rows = replay && replay[label];
+      if (rows && rows.length) {
+        var row = rows[entry.sampleIndex % rows.length];
+        sampleHandler({ kind: "acc", sensor: label, device: device, t: t, recvAt: recvAt, x: num(row.x), y: num(row.y), z: num(row.z) });
+        sampleHandler({ kind: "gyro", sensor: label, device: device, t: t, recvAt: recvAt, gx: num(row.gx), gy: num(row.gy), gz: num(row.gz) });
+      } else {
+        sampleHandler({ kind: "acc", sensor: label, device: device, t: t, recvAt: recvAt,
+          x: Math.sin(t * 1.3 + entry.phase) * 1.5 + noise(), y: noise(), z: 9.8 + noise() });
+        sampleHandler({ kind: "gyro", sensor: label, device: device, t: t, recvAt: recvAt, gx: noise(), gy: noise(), gz: noise() });
+      }
     }
   }
 
   function addSensor(label) {
     statusHandler({ label: label, status: "connecting" });
-    return new Promise(function (resolve) {
-      setTimeout(function () {
-        sensors[label] = {
-          sampleIndex: 0,
-          phase: Math.random() * Math.PI * 2,
-          timer: setInterval(function () { tick(label); }, TICK_MS)
-        };
-        statusHandler({ label: label, status: "connected" });
-        resolve({ label: label, deviceName: "Simulated " + label });
-      }, 150);
+    return loadReplay().then(function () {
+      sensors[label] = {
+        sampleIndex: 0,
+        phase: Math.random() * Math.PI * 2,
+        timer: setInterval(function () { tick(label); }, TICK_MS)
+      };
+      statusHandler({ label: label, status: "connected" });
+      return { label: label, deviceName: "Simulated " + label };
     });
   }
 
@@ -225,6 +268,14 @@ var MSSim = (function () {
   };
 })();
 
+// True when both sleeves are connected, which a recording needs (the analysis
+// compares left and right). Kept up to date by the sensor panel below.
+var sensorStatus = { left: "disconnected", right: "disconnected" };
+function sensorsReady() { return sensorStatus.left === "connected" && sensorStatus.right === "connected"; }
+// Simulated sensors are for trying the flow only: their recordings are never
+// uploaded or analyzed (training.js).
+function sensorsSimulated() { var t = document.getElementById("simToggle"); return !!(t && t.checked); }
+
 /* ---------------- sensor panel ---------------- */
 (function initSensors() {
   var STATUS_TEXT = {
@@ -237,7 +288,7 @@ var MSSim = (function () {
 
   var live = { left: null, right: null };   // latest sample per sensor
   var counts = { left: 0, right: 0 };       // samples since the last UI tick
-  var status = { left: "disconnected", right: "disconnected" };
+  var status = sensorStatus;
   var note = document.getElementById("sensorNote");
   var summary = document.getElementById("sensorSummary");
 
@@ -246,6 +297,8 @@ var MSSim = (function () {
   function transport() { return document.getElementById("simToggle").checked ? MSSim : MSBle; }
 
   function onSample(s) {
+    if (typeof Recorder !== "undefined") Recorder.add(s);
+    if (s.kind !== "acc") return; // the readout shows the accelerometer
     live[s.sensor] = s;
     counts[s.sensor] += 1;
   }
@@ -265,6 +318,8 @@ var MSSim = (function () {
     }
     if (evt.status === "error" && evt.message) note.textContent = evt.label + ": " + evt.message;
     renderSummary();
+    // Lets the training view show or hide its Record buttons.
+    document.dispatchEvent(new CustomEvent("vlo:sensors"));
   }
   MSBle.setStatusHandler(applyStatus);
   MSSim.setStatusHandler(applyStatus);
@@ -320,7 +375,7 @@ var MSSim = (function () {
       b.disabled = !simulating && !navigator.bluetooth;
     });
     note.textContent = simulating
-      ? "Simulated sensors: fake but plausible accelerometer data through the same code path as real hardware."
+      ? "Simulated sensors: replaying a recorded set of 11 squats, to try connecting and recording. Simulated recordings are never saved or analyzed."
       : unsupportedNote;
   });
 

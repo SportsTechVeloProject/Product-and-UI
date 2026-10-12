@@ -108,6 +108,8 @@ function showPlans() {
   document.getElementById("exerciseView").hidden = true;
   hideTeamPage();
   document.getElementById("plansView").hidden = false;
+  if (typeof loadTeamPlans === "function") loadTeamPlans();
+  if (typeof refreshPlansTab === "function") refreshPlansTab();
   document.querySelectorAll(".apptab").forEach(function (b) {
     b.setAttribute("aria-selected", b.dataset.view === "plans" ? "true" : "false");
   });

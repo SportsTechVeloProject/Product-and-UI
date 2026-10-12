@@ -19,6 +19,16 @@ Usage (needs numpy, scipy, pandas, matplotlib, imufusion):
   python main.py --session <id> --replace                  # same, replacing its reps
   add --plot to any of them to see the data team's plots
 
+  python main.py --watch                                   # the processing watcher, see below
+
+The watcher (--watch) is how sets recorded in the website get analyzed: every
+couple of seconds it looks for recordings that haven't been analyzed yet
+(sessions.analyzed_at and analysis_error both empty), runs the code for their
+exercise, saves the reps and sets analyzed_at, or analysis_error if it fails.
+It processes everyone's recordings, so it uses the project's service key
+instead of a login: set SUPABASE_SERVICE_KEY first (Supabase dashboard →
+Project Settings → API → service_role). Keep that key secret.
+
 Login: you're asked for the athlete's V-Lo email and password (or set
 VLO_EMAIL / VLO_PASSWORD). The set is saved under that athlete; their coach
 sees it on the team page.
@@ -32,17 +42,25 @@ import json
 import math
 import os
 import sys
+import time
+import urllib.parse
 import uuid
 
 import supabase_api as db
 import squats
 
-# sessions.exercise -> the code that processes it
-EXERCISES = {
-    "back_squat": squats.analyze,
-    # "deadlift": deadlift.analyze,
-    # "bench_press": benchpress.analyze,
-}
+# sessions.exercise -> the code that processes it. The keys are the exercise
+# bank's (js/exercises.js): every exercise there with sensor "squat" uses the
+# squat analysis, and so on. Keep these lists in step with the bank.
+SQUAT_FAMILY = ["back_squat", "high_bar_squat", "low_bar_squat", "pause_squat", "tempo_squat",
+                "box_squat", "pin_squat", "front_squat", "safety_bar_squat"]
+BENCH_FAMILY = ["bench_press", "pause_bench", "close_grip_bench", "wide_grip_bench", "tempo_bench",
+                "spoto_press", "larsen_press", "board_press", "pin_press", "floor_press"]
+DEADLIFT_FAMILY = ["deadlift", "sumo_deadlift", "pause_deadlift", "deficit_deadlift", "block_pull"]
+
+EXERCISES = {key: squats.analyze for key in SQUAT_FAMILY}
+# EXERCISES.update({key: benchpress.analyze for key in BENCH_FAMILY})    # when the data team adds it
+# EXERCISES.update({key: deadlift.analyze for key in DEADLIFT_FAMILY})
 
 SAMPLE_FIELDS = ("sensor", "t", "recvAt", "x", "y", "z", "gx", "gy", "gz")
 
@@ -129,10 +147,16 @@ def process_session(token, session_id, plot=False):
     return analyze(samples, session["exercise"], session["reported_rep_count"], plot)
 
 
+NO_ANALYSIS_YET = "No analysis for "  # marker in sessions.analysis_error; see watch()
+
+
+class NoAnalysisYet(Exception):
+    """The lift can be recorded but nobody has written its analysis yet."""
+
+
 def analyze(samples, exercise, reps=None, plot=False):
     if exercise not in EXERCISES:
-        raise SystemExit("No processing code for exercise %r yet (have: %s)."
-                         % (exercise, ", ".join(EXERCISES)))
+        raise NoAnalysisYet("%s%s yet (have: %s)." % (NO_ANALYSIS_YET, exercise, ", ".join(sorted(EXERCISES))))
     results = EXERCISES[exercise](samples, reps=reps, plot=plot)
     print("   Processed with %s: %d reps" % (results["version"], len(results["reps"])))
     return results
@@ -160,6 +184,22 @@ def save_reps(token, session_id, results, replace=False):
     print("4. Saved %d reps%s" % (len(rows), " (replaced %d)" % len(existing) if existing else ""))
 
 
+def mark_analyzed(token, session_id, error=None, quiet=False):
+    """Records that the session has been analyzed (or why it couldn't be), so
+    the website stops showing "Processing…" and the watcher skips it."""
+    try:
+        db.update(token, "sessions", "id=eq." + session_id, {
+            "analyzed_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "analysis_error": error,
+        })
+    except db.SupabaseError as err:
+        # Before supabase/migrations/2026-10-12-sessions-analysis-status.sql is run
+        # the columns don't exist; with a normal login, updating may not be allowed.
+        if not quiet:
+            raise
+        print("   (couldn't mark the session as analyzed: %s)" % str(err)[:120])
+
+
 # ============================================================
 # 5. Summary
 # ============================================================
@@ -183,6 +223,88 @@ def fmt(v):
 
 
 # ============================================================
+# 6. The processing watcher
+# ============================================================
+
+WAITING = ("select=id,user_id,exercise,reported_rep_count,raw_data_path,recorded_at"
+           "&analyzed_at=is.null&analysis_error=is.null&raw_data_path=not.is.null"
+           "&order=recorded_at.asc&limit=10")
+
+
+def watch(interval):
+    key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not key:
+        sys.exit("Set SUPABASE_SERVICE_KEY first (Supabase dashboard → Project Settings → API → "
+                 "service_role key). It lets the watcher process every athlete's recordings; keep it secret.")
+    db.use_service_key(key)
+    retry_new_analyses()
+    print("Watching for new recordings every %g s. Press Ctrl+C to stop." % interval)
+    try:
+        while True:
+            try:
+                waiting = db.select(None, "sessions", WAITING)
+            except (db.SupabaseError, OSError) as err:
+                print("Couldn't check for recordings (%s); trying again." % str(err)[:160])
+                waiting = []
+            for session in waiting:
+                process_waiting(session)
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\nStopped watching.")
+
+
+def process_waiting(session):
+    """Analyzes one recording from the website and saves its reps."""
+    started = time.time()
+    sid = session["id"]
+    label = "%s %s" % (sid[:8], session["exercise"])
+    try:
+        samples = db.download_raw(None, session["raw_data_path"])
+        results = analyze(samples, session["exercise"], session["reported_rep_count"])
+        save_reps(None, sid, results, replace=True)
+        mark_analyzed(None, sid)
+        took = time.time() - started
+        since = seconds_since(session.get("recorded_at"))
+        print("OK      %s: %d reps in %.1f s%s" % (
+            label, len(results["reps"]), took, "" if since is None else " (%.0f s after the set started)" % since))
+    except NoAnalysisYet as err:
+        # Not a failure: keep it waiting (analyzed_at stays empty) so it's
+        # processed once the analysis exists; see retry_new_analyses().
+        try:
+            db.update(None, "sessions", "id=eq." + sid, {"analysis_error": str(err)[:500]})
+        except (db.SupabaseError, OSError):
+            pass
+        print("WAITING %s: %s" % (label, err))
+    except (Exception, SystemExit) as err:
+        reason = (str(err) or err.__class__.__name__).strip()[:500]
+        try:
+            mark_analyzed(None, sid, error=reason)
+        except (db.SupabaseError, OSError):
+            pass
+        print("FAILED  %s: %s" % (label, reason))
+
+
+def retry_new_analyses():
+    """Recordings of lifts that had no analysis yet: if one exists now, clear
+    their marker so the watcher processes them like new recordings."""
+    keys = ",".join(sorted(EXERCISES))
+    try:
+        db.update(None, "sessions",
+                  "exercise=in.(%s)&analyzed_at=is.null&analysis_error=like.%s*" % (keys, urllib.parse.quote(NO_ANALYSIS_YET)),
+                  {"analysis_error": None})
+    except (db.SupabaseError, OSError) as err:
+        print("Couldn't re-queue older recordings (%s)." % str(err)[:160])
+
+
+def seconds_since(iso):
+    try:
+        when = datetime.datetime.fromisoformat(iso.replace("Z", "+00:00"))
+        return (datetime.datetime.now(datetime.timezone.utc) - when).total_seconds()
+    except (AttributeError, ValueError):
+        return None
+
+
+# ============================================================
 # Main
 # ============================================================
 
@@ -202,10 +324,15 @@ def main():
     parser.add_argument("--replace", action="store_true", help="replace reps that already exist")
     parser.add_argument("--dry-run", action="store_true", help="load and process only; nothing stored")
     parser.add_argument("--plot", action="store_true", help="show the data team's plots")
+    parser.add_argument("--watch", action="store_true", help="keep processing new recordings from the website")
+    parser.add_argument("--interval", type=float, default=2.0, help="with --watch: seconds between checks (default 2)")
     args = parser.parse_args()
 
+    if args.watch:
+        watch(args.interval)
+        return
     if not args.recording and not args.session:
-        parser.error("give a recording file, or --session <id>")
+        parser.error("give a recording file, --session <id>, or --watch")
 
     if args.dry_run:
         samples = load_recording(args.recording)
@@ -221,10 +348,14 @@ def main():
             session_id = store_session(token, user_id, samples, args.exercise, args.weight, args.reps)
         results = process_session(token, session_id, args.plot)
         save_reps(token, session_id, results, args.replace)
+        mark_analyzed(token, session_id, quiet=True)
         print_summary(results, session_id)
     except db.SupabaseError as err:
         sys.exit("Supabase error: %s" % err)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except NoAnalysisYet as err:
+        sys.exit(str(err))
