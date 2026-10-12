@@ -284,8 +284,11 @@ if (logoutBtnEl) {
 }
 
 // Shared by the login pop-up and account settings.
+var signingOut = false;
 function signOut() {
+  signingOut = true;
   return sb.auth.signOut().then(function () {
+    signingOut = false;
     currentTeam = null;
     currentUser = null;
     currentProfile = null;
@@ -319,8 +322,16 @@ document.addEventListener("keydown", function (e) {
 // open right away in signup mode so the invite is actually visible instead
 // of silently waiting for the visitor to click "Log in" on their own.
 if (sb) {
-  sb.auth.onAuthStateChange(function (event) {
+  sb.auth.onAuthStateChange(function (event, session) {
     if (event === "PASSWORD_RECOVERY") showResetForm();
+    // All tabs share one login. If another tab logs in as someone else (or
+    // out), this page would otherwise keep showing the old account while its
+    // requests go out as the new one, and the database rejects them. Reload so
+    // the page matches the login. Our own sign-out sets signingOut first.
+    var sessionUserId = session && session.user ? session.user.id : null;
+    if (currentUser && !signingOut && sessionUserId !== currentUser.id) {
+      window.location.reload();
+    }
   });
   sb.auth.getSession().then(function (res) {
     if (isRecoveryLink) {

@@ -114,6 +114,21 @@ function zoneColor(ex, v) {
   return "var(--zone-" + ex.zones.length + ")";
 }
 
+// The speed range of a training zone for a lift, { lo, hi, mid } in m/s, for
+// aiming a set's average speed. Zones are listed fastest first and the top
+// zone has no upper limit (nor the bottom one a lower), so those two get a
+// band of ZONE_OPEN_BAND for aiming. Zone limits live in EXERCISES above.
+var ZONE_OPEN_BAND = 0.2;
+function zoneRange(ex, label) {
+  var idx = -1;
+  ex.zones.forEach(function (z, i) { if (z.label === label) idx = i; });
+  if (idx === -1) return null;
+  var lo = ex.zones[idx].min;
+  var hi = idx === 0 ? lo + ZONE_OPEN_BAND : ex.zones[idx - 1].min;
+  if (lo === 0) lo = Math.max(0.05, hi - ZONE_OPEN_BAND);
+  return { lo: lo, hi: hi, mid: (lo + hi) / 2 };
+}
+
 // Uneven rep: left and right mean speeds differ by more than this share of
 // the rep's speed. 0.22 (22%) is a placeholder chosen so only the most uneven
 // rep in the first recorded set gets flagged; change it here once there's

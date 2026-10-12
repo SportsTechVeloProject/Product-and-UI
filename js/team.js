@@ -301,7 +301,12 @@ function repMeanSpeed(rep) {
   return null;
 }
 
+var progressMember = null;
+authEl("progressTraining").addEventListener("click", function () { if (progressMember) openAthleteTraining(progressMember); });
+
 function showProgress(member) {
+  progressMember = member;
+  authEl("progressTraining").textContent = currentUser && member.user_id === currentUser.id ? "See my training" : "See their training";
   var card = authEl("athleteProgress");
   card.hidden = false;
   authEl("progressName").textContent = member.full_name;
@@ -715,6 +720,8 @@ function onAccountChanged() {
   updateProfileButton();
   refreshInbox();
   loadMySets();
+  loadTeamPlans();
+  resetTraining();
   if (!teamViewEl.hidden) renderTeamPage();
 }
 updateProfileButton();
