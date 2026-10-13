@@ -12,5 +12,6 @@ Thumbs.db
 .tmp-fixtures/
 
 # python
+.env
 __pycache__/
 *.pyc
