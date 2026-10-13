@@ -138,12 +138,14 @@ def recorded_at(samples):
 def process_session(token, session_id, plot=False):
     """Downloads the session's raw JSON and runs the code for its exercise."""
     found = db.select(token, "sessions",
-                      "select=id,exercise,reported_rep_count,raw_data_path&id=eq." + session_id)
+                      "select=id,exercise,reported_rep_count,raw_data_path,target_zone&id=eq." + session_id)
     if not found:
         raise SystemExit("No session %s, or this account can't see it." % session_id)
     session = found[0]
     samples = db.download_raw(token, session["raw_data_path"])
-    print("3. Downloaded %d samples for session %s (%s)" % (len(samples), session_id, session["exercise"]))
+    print("3. Downloaded %d samples for session %s (%s) from %s/%s" % (
+        len(samples), session_id, session["exercise"], db.RAW_BUCKET, session["raw_data_path"]))
+    print("   Target zone: %s" % (session.get("target_zone") or "none"))
     return analyze(samples, session["exercise"], session["reported_rep_count"], plot)
 
 
@@ -226,7 +228,7 @@ def fmt(v):
 # 6. The processing watcher
 # ============================================================
 
-WAITING = ("select=id,user_id,exercise,reported_rep_count,raw_data_path,recorded_at"
+WAITING = ("select=id,user_id,exercise,reported_rep_count,raw_data_path,recorded_at,target_zone"
            "&analyzed_at=is.null&analysis_error=is.null&raw_data_path=not.is.null"
            "&order=recorded_at.asc&limit=10")
 
@@ -265,8 +267,9 @@ def process_waiting(session):
         mark_analyzed(None, sid)
         took = time.time() - started
         since = seconds_since(session.get("recorded_at"))
-        print("OK      %s: %d reps in %.1f s%s" % (
-            label, len(results["reps"]), took, "" if since is None else " (%.0f s after the set started)" % since))
+        print("OK      %s: %d reps in %.1f s%s, target zone: %s" % (
+            label, len(results["reps"]), took, "" if since is None else " (%.0f s after the set started)" % since,
+            session.get("target_zone") or "none"))
     except NoAnalysisYet as err:
         # Not a failure: keep it waiting (analyzed_at stays empty) so it's
         # processed once the analysis exists; see retry_new_analyses().

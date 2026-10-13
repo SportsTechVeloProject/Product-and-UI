@@ -20,7 +20,8 @@ function newId() {
   });
 }
 
-// rec: what Recorder.stop() returned. details: { exercise, weightKg, reps }.
+// rec: what Recorder.stop() returned. details: { exercise, weightKg, reps, targetZone }
+// (targetZone: the coach's zone name from the plan, or null).
 // Resolves to the new session id.
 function uploadRecording(rec, details) {
   var sessionId = newId();
@@ -35,6 +36,7 @@ function uploadRecording(rec, details) {
         exercise: details.exercise,
         weight_kg: details.weightKg,
         reported_rep_count: details.reps,
+        target_zone: details.targetZone || null,
         recorded_at: new Date(rec.startedAt).toISOString(),
         raw_data_path: path
       });
