@@ -1063,6 +1063,12 @@
   .training-sensor-hint.is-ready { color: var(--accent); }
   .training-last { font-size: 0.84rem; margin: 0; }
   .training-zone { font-size: 0.86rem; margin: 0; color: var(--good); font-weight: 500; }
+  .training-zone.is-missing { color: var(--muted); font-weight: 400; }
+  .training-speed { font: 600 0.9rem 'IBM Plex Mono', monospace; padding: 6px 8px; border-radius: 3px; text-align: center; }
+  .training-speed.is-empty { color: var(--muted); font-weight: 400; }
+  .training-speed.is-in { color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+  .training-speed.is-above, .training-speed.is-below { color: var(--zone2); background: color-mix(in srgb, var(--zone-3) 14%, transparent); }
+  .training-set input.is-suggested { border-color: var(--accent); border-style: dashed; background: color-mix(in srgb, var(--accent) 7%, var(--bg)); }
   .training-suggest { font-size: 0.86rem; margin: 0; padding: 6px 10px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .training-set-wrap .training-suggest { margin: 2px 0 6px 54px; }
   .training-suggest.next-up, .training-suggest.next-down { background: color-mix(in srgb, var(--zone-3) 14%, transparent); }
@@ -1114,6 +1120,12 @@
   .training-rec.pending { color: var(--muted); }
   .training-rec.done { color: var(--fg); }
   .training-rec.error { color: var(--warn); }
+  @media (max-width: 560px) {
+    .training-set { gap: 6px; }
+    .training-set-controls { grid-column: 2 / -1; }
+    .training-set-head span:last-child { display: none; }
+    .training-rec, .training-set-wrap .training-suggest { margin-left: 50px; }
+  }
   .training-add { align-self: flex-start; padding: 6px 12px; font-size: 0.84rem; margin: 0; }
   .training-add-ex { display: flex; gap: 8px; flex-wrap: wrap; }
   .training-add-ex input { flex: 1 1 260px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--fg); font: inherit; }
@@ -1291,6 +1303,16 @@
   .plan-item-note { font-style: italic; }
   .plan-item-vbt { color: var(--good); font-weight: 500; }
   .plan-item-warn { color: var(--zone2); }
+  .zone-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
+  .zone-picker-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+  .zone-choice { font: 500 0.72rem 'IBM Plex Sans', sans-serif; padding: 3px 8px; border-radius: 10px; border: 1px solid var(--border); background: none; color: var(--muted); cursor: pointer; }
+  .zone-choice:hover { color: var(--fg); border-color: var(--muted); }
+  .zone-choice[aria-pressed="true"] { color: var(--fg); font-weight: 600; }
+  .zone-choice.zone-1[aria-pressed="true"] { border-color: var(--zone-1); background: color-mix(in srgb, var(--zone-1) 16%, transparent); }
+  .zone-choice.zone-2[aria-pressed="true"] { border-color: var(--zone-2); background: color-mix(in srgb, var(--zone-2) 16%, transparent); }
+  .zone-choice.zone-3[aria-pressed="true"] { border-color: var(--zone-3); background: color-mix(in srgb, var(--zone-3) 16%, transparent); }
+  .zone-choice.zone-4[aria-pressed="true"] { border-color: var(--zone-4); background: color-mix(in srgb, var(--zone-4) 16%, transparent); }
+  .zone-missing { color: var(--warn); }
 
   .plan-unparsed {
     border: 1px solid var(--border);

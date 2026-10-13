@@ -291,6 +291,8 @@ var TIPS = {
   zone: "Velocity-based training: instead of a fixed weight, your coach picks a speed zone. Choose the weight so the set's average rep speed lands in this range. The app suggests it from your own recorded sets.",
   start: "From your load–velocity line: your recent recorded sets of this exercise at different weights show how fast each weight moves for you. This is the weight that should move at the middle of the zone, rounded to 2.5 kg. You can always type your own.",
   next: "Your last set's average speed compared with the zone: faster means the weight is light for you today, slower means heavy. How many kilos to change comes from your own load–velocity line, at most 10% per set.",
+  speed: "The set's average speed: the mean speed of each rep, averaged over the set. ✓ means it landed in your coach's zone; ↑ faster than the zone (the weight was light), ↓ slower (heavy).",
+  noZone: "Your coach hasn't picked a speed zone for this lift, so there's no speed target and no weight suggestions. You can still record the sets and see their speed.",
   result: "Mean: the average speed of the set's reps, the number zones use. Fastest: the quickest rep. Velocity loss: how much slower the last rep was than the first; more loss means more fatigue.",
   timer: "Start workout starts the clock, and it keeps running if you leave the page. Logging a set starts it too. Finish workout stops it and saves how long you trained."
 };
@@ -513,7 +515,10 @@ function fieldLabel(field, item, info) {
   if (field === "time") return timeUnit(item, info) === 60 ? "Time (min)" : "Time (s)";
   return FIELD_LABEL[field];
 }
-function rowColumns(n) { return "44px repeat(" + n + ", 112px) minmax(0, 1fr)"; }
+// Set, the exercise's fields, the measured speed for Movesense lifts, then the buttons.
+function rowColumns(info) {
+  return "44px repeat(" + info.fields.length + ", minmax(0, 112px))" + (info.lift ? " minmax(0, 84px)" : "") + " minmax(0, 1fr)";
+}
 
 function renderTrainingDay() {
   var host = document.getElementById("trainingDay");
@@ -621,9 +626,12 @@ function exerciseCard(w, item, itemIndex, readOnly) {
     range = { lo: item.velocity.min, hi: vhi, mid: (item.velocity.min + vhi) / 2 };
   }
   var points = range ? liftPoints(training.history, info.key) : [];
+  info.range = range;
   if (item.zone && range) {
-    card.appendChild(withTip(el("p", "training-zone", "Zone: " + item.zone + " · aim " + range.lo.toFixed(2) + "–" + range.hi.toFixed(2) +
-      " m/s, the average speed of the set's reps "), TIPS.zone));
+    card.appendChild(withTip(el("p", "training-zone", "Speed zone: " + item.zone + " · " + range.lo.toFixed(2) + "–" + range.hi.toFixed(2) +
+      " m/s average "), TIPS.zone));
+  } else if (info.lift && !range && w.assignment_id) {
+    card.appendChild(withTip(el("p", "training-zone is-missing", "No speed zone set by your coach "), TIPS.noZone));
   }
   if (info.recordable && !readOnly) {
     var ready = sensorsReady();
@@ -677,9 +685,10 @@ function exerciseCard(w, item, itemIndex, readOnly) {
   if (rec && rec.workoutId === w.id && rec.itemIndex === itemIndex && rec.name === item.name) count = Math.max(count, rec.setNo);
   var table = el("div", "training-sets");
   var head = el("div", "training-set training-set-head");
-  head.style.gridTemplateColumns = rowColumns(info.fields.length);
+  head.style.gridTemplateColumns = rowColumns(info);
   head.appendChild(el("span", "", "Set"));
   info.fields.forEach(function (f) { head.appendChild(el("span", "", fieldLabel(f, item, info))); });
+  if (info.lift) head.appendChild(withTip(el("span", "", "Speed "), TIPS.speed));
   head.appendChild(el("span", "", ""));
   table.appendChild(head);
 
@@ -689,14 +698,14 @@ function exerciseCard(w, item, itemIndex, readOnly) {
   // weight, reps, time, distance); a speed-based suggestion overrides the weight.
   var lastDone = logs.slice().sort(function (a, b) { return b.set_no - a.set_no; })[0];
   function defaultsFor(setNo) {
-    var d = { kg: defaultKg, reps: item.reps, duration: item.duration, distance: null };
+    var d = { kg: defaultKg, reps: item.reps, duration: item.duration, distance: null, suggested: !!start };
     if (lastDone && setNo > lastDone.set_no) {
-      if (lastDone.weight_kg !== null) d.kg = Number(lastDone.weight_kg);
+      if (lastDone.weight_kg !== null) { d.kg = Number(lastDone.weight_kg); d.suggested = false; }
       if (lastDone.reps !== null) d.reps = lastDone.reps;
       if (lastDone.duration_s != null) d.duration = lastDone.duration_s;
       if (lastDone.distance_m != null) d.distance = Number(lastDone.distance_m);
     }
-    if (next && next.state !== "stop" && setNo > nextAfterSet) d.kg = next.kg;
+    if (next && next.state !== "stop" && setNo > nextAfterSet) { d.kg = next.kg; d.suggested = true; }
     return d;
   }
   for (var s = 1; s <= count; s++) {
@@ -727,7 +736,7 @@ function sameRow(a, w, itemIndex, name, setNo) {
 function setRow(w, item, info, itemIndex, setNo, log, defaults, readOnly) {
   var wrap = el("div", "training-set-wrap");
   var row = el("div", "training-set" + (log ? " is-done" : ""));
-  row.style.gridTemplateColumns = rowColumns(info.fields.length);
+  row.style.gridTemplateColumns = rowColumns(info);
   wrap.appendChild(row);
   row.appendChild(el("span", "training-set-no", String(setNo)));
   var key = w.id + "|" + itemIndex + "|" + item.name + "|" + setNo;
@@ -758,10 +767,15 @@ function setRow(w, item, info, itemIndex, setNo, log, defaults, readOnly) {
     }
     inp.value = v === null || v === undefined ? "" : Number(v);
     inp.disabled = readOnly || !!log || uploadingThis;
-    inp.addEventListener("input", function () { inp.dataset.edited = "1"; });
+    if ((f === "weight" || f === "added") && !log && defaults.suggested && v != null) {
+      inp.classList.add("is-suggested");
+      inp.title = "Suggested from your speed. Type your own if you like.";
+    }
+    inp.addEventListener("input", function () { inp.dataset.edited = "1"; inp.classList.remove("is-suggested"); });
     inputs[f] = inp;
     row.appendChild(inp);
   });
+  if (info.lift) row.appendChild(speedCell(log, info.range));
 
   var controls = el("span", "training-set-controls");
   row.appendChild(controls);
@@ -852,6 +866,23 @@ function setRow(w, item, info, itemIndex, setNo, log, defaults, readOnly) {
   return wrap;
 }
 
+// The set's measured average speed, marked against the zone when there is one.
+function speedCell(log, range) {
+  var r = log && log.recording_id ? training.recordings[log.recording_id] : null;
+  var speed = r && r.analyzed_at ? setSpeed(r.reps) : null;
+  if (speed === null) {
+    var waiting = r && !r.analyzed_at && !r.analysis_error;
+    var empty = el("span", "training-speed is-empty", waiting ? "…" : "–");
+    if (waiting) empty.title = "Waiting for the recording to be analyzed";
+    return empty;
+  }
+  var where = !range ? "" : speed > range.hi ? "above" : speed < range.lo ? "below" : "in";
+  var mark = { "in": " ✓", above: " ↑", below: " ↓", "": "" }[where];
+  var cell = el("span", "training-speed" + (where ? " is-" + where : ""), speed.toFixed(2) + mark);
+  cell.title = speed.toFixed(2) + " m/s average" + (where === "in" ? ", in the zone" : where === "above" ? ", faster than the zone" : where === "below" ? ", slower than the zone" : "");
+  return cell;
+}
+
 function saveSet(w, item, info, itemIndex, setNo, v, recordingId) {
   return sb.from("set_logs").insert({
     workout_id: w.id, athlete_id: currentUser.id, item_index: itemIndex, exercise: info.name,
@@ -907,7 +938,7 @@ function stopRecording(w, item, info, itemIndex, setNo, v) {
   }
   training.uploading = { workoutId: w.id, itemIndex: itemIndex, name: item.name, setNo: setNo };
   renderTrainingDay();
-  uploadRecording(rec, { exercise: info.key || exerciseFold(info.name).replace(/ /g, "_"), weightKg: v.kg, reps: v.reps })
+  uploadRecording(rec, { exercise: info.key || exerciseFold(info.name).replace(/ /g, "_"), weightKg: v.kg, reps: v.reps, targetZone: item.zone || null })
     .then(function (sessionId) {
       training.recordings[sessionId] = { analyzed_at: null, analysis_error: null, reps: [] };
       return saveSet(w, item, info, itemIndex, setNo, v, sessionId);
