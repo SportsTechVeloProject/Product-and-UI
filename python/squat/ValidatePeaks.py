@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import imufusion
 from scipy.signal import find_peaks
 import matplotlib.pyplot as plt
 from scipy.integrate import cumulative_trapezoid

@@ -285,7 +285,7 @@ function selectWorkout(w) {
 // Short explanations shown on hover (or tap / keyboard focus) next to the
 // thing they explain.
 var TIPS = {
-  movesense: "Record this exercise with the two Movesense sensors on the bar: press \u25cf Record before the set and \u25a0 Stop after it. You get each rep's speed, and with a zone from your coach, a weight suggestion for the next set.",
+  movesense: "Record this exercise with the two Movesense sensors on the bar: press \u25cf Record and stand still for a few seconds before the set, and press \u25a0 Stop only after the bar is back in the rack (the analysis uses both to find the set). You get each rep's speed, and with a zone from your coach, a weight suggestion for the next set.",
   soon: "The sensors can record this lift and the recording is saved, but its analysis hasn't been written yet. Speeds appear by themselves once it is.",
   manual: "Not recorded with the sensors: fill in the fields and press Done.",
   zone: "Velocity-based training: instead of a fixed weight, your coach picks a speed zone. Choose the weight so the set's average rep speed lands in this range. The app suggests it from your own recorded sets.",
@@ -638,7 +638,7 @@ function exerciseCard(w, item, itemIndex, readOnly) {
     var hint = el("p", "training-sensor-hint" + (ready ? " is-ready" : ""), ready
       ? (sensorsSimulated()
         ? "Simulated sensors: Record and Stop work to try the flow, but simulated recordings aren't saved or analyzed."
-        : "Sensors connected: press \u25cf Record before the set and \u25a0 Stop after it.")
+        : "Sensors connected: press \u25cf Record, stand still for a few seconds, do the set, rack the bar, then press \u25a0 Stop.")
       : "Sensors not connected. ");
     if (!ready) {
       var connect = el("button", "text-link", "Connect sensors \u2191");

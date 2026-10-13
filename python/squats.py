@@ -1,26 +1,79 @@
-"""squats.py — the data team's Squats.py as a function main.py can call.
+"""squats.py — the data team's Squats2.py as a function main.py can call.
 
-Same steps, helpers and settings as Product-testing (data-team branch,
-Python/Squats/Squats.py, commit 776cd7b). Only the start and the end differ:
-  - input:  the session's samples (list of dicts) instead of reading a CSV
-  - output: one dict per rep instead of output.json; plots only with plot=True
-  - reps:   the reported rep count if given, otherwise the number of valid
-            peaks (the original had reps=11 hard-coded)
+Their files are in squat/, copied unchanged from Product-testing by
+sync_data_team.py (squat/SOURCE.txt says which commit). This file runs the
+same steps as squat/Squats2.py; only the start and the end differ:
+  - input:  the recording's samples (list of dicts) instead of a CSV, the
+            reported rep count, and the coach's zone instead of TYPE
+  - output: one dict per rep instead of results.json; their plots and debug
+            prints only with plot=True
+After a sync, check that analyze() still matches Squats2.py.
+
+Squats2.py uses one sensor: the side whose velocity drifts least. Its reps
+fill that side's columns; the other side stays empty.
 """
+
+import contextlib
+import io
+import os
+import sys
 
 import numpy as np
 import pandas as pd
+
+SQUAT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "squat")
+sys.path.insert(0, SQUAT_DIR)  # their files import each other by plain name
+
 import matplotlib.pyplot as plt
-
 import MagdwickFilter
-import ValidatePeaks
-import PeakDetection
 import VelocityCalculations
+from scipy.integrate import cumulative_trapezoid
 
-VERSION = "Squats.py (data-team 776cd7b)"
+# The coach's zone -> Squats2's TYPE. Might change; ask the data team.
+ZONE_TYPES = {
+    "Speed–strength": "fast",
+    "Strength–speed": "medium",
+    "Accelerative strength": "slow",
+    "Maximal strength": "slow",
+}
+DEFAULT_TYPE = "medium"  # no zone (free workouts, older recordings)
+
+SAMPLE_RATE = 104.0  # Hz
+WINDOW_SIZE = 15
+MIN_SECONDS = 6      # their drift step reads the first 5 s, so shorter can't work
 
 
-def analyze(samples, reps=None, plot=False):
+def source():
+    try:
+        with open(os.path.join(SQUAT_DIR, "SOURCE.txt"), encoding="utf-8") as f:
+            line = f.read().splitlines()[1]
+        return "Squats2.py (Product-testing %s)" % line.split("commit ")[1].split(" ")[0]
+    except (OSError, IndexError):
+        return "Squats2.py (Product-testing)"
+
+
+VERSION = source()
+
+
+def is_left_better(magnitude_filtered_right, magnitude_filtered_left, t_sec_right, t_sec_left):
+    """Copied from Squats2.py (importing it would run their whole script):
+    True when the left sensor's velocity drifts less than the right's."""
+    mean_acceleration_left = np.mean(magnitude_filtered_left[104:208])
+    mean_acceleration_right = np.mean(magnitude_filtered_right[104:208])
+    velocity_left = cumulative_trapezoid(magnitude_filtered_left - mean_acceleration_left, t_sec_left, initial=0)
+    velocity_right = cumulative_trapezoid(magnitude_filtered_right - mean_acceleration_right, t_sec_right, initial=0)
+    return np.max(np.abs(velocity_left[312:-520])) < np.max(np.abs(velocity_right[312:-520]))
+
+
+def analyze(samples, reps=None, zone=None, plot=False):
+    warnings = []
+    if not reps:
+        raise ValueError("The number of reps is needed to analyze a squat set (Squats2 looks for exactly that many).")
+    speed_type = ZONE_TYPES.get(zone)
+    if not speed_type:
+        speed_type = DEFAULT_TYPE
+        warnings.append("No target zone: analyzed as '%s'." % DEFAULT_TYPE)
+
     # ============================================================
     # Samples -> table (was: pd.read_csv)
     # ============================================================
@@ -37,107 +90,103 @@ def analyze(samples, reps=None, plot=False):
 
     left_data = data[data["sensor"] == "left"].sort_values("t").reset_index(drop=True)
     right_data = data[data["sensor"] == "right"].sort_values("t").reset_index(drop=True)
-    if len(left_data) < 300 or len(right_data) < 300:
-        raise ValueError(
-            "Need a few seconds from both sensors (got %d left, %d right samples)."
-            % (len(left_data), len(right_data)))
+    need = int(MIN_SECONDS * SAMPLE_RATE)
+    if len(left_data) < need or len(right_data) < need:
+        raise ValueError("Recording too short: Squats2 needs at least %d s from both sensors, starting with "
+                         "2–5 s standing still (got %.1f s left, %.1f s right)."
+                         % (MIN_SECONDS, len(left_data) / SAMPLE_RATE, len(right_data) / SAMPLE_RATE))
 
-    t_left_sec = left_data["t"].to_numpy() - left_data["t"].iloc[0]
-    t_right_sec = right_data["t"].to_numpy() - right_data["t"].iloc[0]
+    x_left, y_left, z_left = (left_data[c].to_numpy() for c in ("x", "y", "z"))
+    x_right, y_right, z_right = (right_data[c].to_numpy() for c in ("x", "y", "z"))
+    t_left = left_data["t"].to_numpy()
+    t_right = right_data["t"].to_numpy()
 
     # ============================================================
-    # Sample rate
+    # Raw acceleration magnitude
     # ============================================================
 
-    sample_rate = 104.0  # Hz
-    dt_left = 1.0 / sample_rate
-    dt_right = 1.0 / sample_rate
+    magnitude_left_raw = np.sqrt(x_left**2 + y_left**2 + z_left**2)
+    magnitude_right_raw = np.sqrt(x_right**2 + y_right**2 + z_right**2)
+
+    # ============================================================
+    # Time
+    # ============================================================
+
+    t_left_sec = t_left - t_left[0]
+    t_right_sec = t_right - t_right[0]
 
     # ============================================================
     # Filter using magdwick filter
     # ============================================================
 
-    earth_acceleration_left, magnitude_left_filtered = MagdwickFilter.madgwick_filter(
-        left_data["x"].to_numpy(), left_data["y"].to_numpy(), left_data["z"].to_numpy(),
-        left_data["gx"].to_numpy(), left_data["gy"].to_numpy(), left_data["gz"].to_numpy(),
-        dt_left)
-    earth_acceleration_right, magnitude_right_filtered = MagdwickFilter.madgwick_filter(
-        right_data["x"].to_numpy(), right_data["y"].to_numpy(), right_data["z"].to_numpy(),
-        right_data["gx"].to_numpy(), right_data["gy"].to_numpy(), right_data["gz"].to_numpy(),
-        dt_right)
-
-    # Invert (as in Squats.py)
-    earth_acceleration_left = -earth_acceleration_left
-    earth_acceleration_right = -earth_acceleration_right
+    dt = 1.0 / SAMPLE_RATE
+    _, magnitude_left_filtered = MagdwickFilter.madgwick_filter(
+        x_left, y_left, z_left,
+        left_data["gx"].to_numpy(), left_data["gy"].to_numpy(), left_data["gz"].to_numpy(), dt)
+    _, magnitude_right_filtered = MagdwickFilter.madgwick_filter(
+        x_right, y_right, z_right,
+        right_data["gx"].to_numpy(), right_data["gy"].to_numpy(), right_data["gz"].to_numpy(), dt)
 
     # ============================================================
-    # Peaks
+    # Calculate velocity using the filtered acceleration (one side)
     # ============================================================
 
-    peaks_right, _, _ = PeakDetection.peak_detection(
-        earth_acceleration_right[:, 2], window_size=50, k=2, distance=100)
-    peaks_left, _, _ = PeakDetection.peak_detection(
-        earth_acceleration_left[:, 2], window_size=50, k=2, distance=100)
+    if is_left_better(magnitude_right_filtered, magnitude_left_filtered, t_right_sec, t_left_sec):
+        side, magnitude, t_sec, raw = "left", magnitude_left_filtered, t_left_sec, magnitude_left_raw
+    else:
+        side, magnitude, t_sec, raw = "right", magnitude_right_filtered, t_right_sec, magnitude_right_raw
 
-    valid_peaks_right = ValidatePeaks.validate_peaks(magnitude_right_filtered, peaks_right, sample_rate)
-    valid_peaks_left = ValidatePeaks.validate_peaks(magnitude_left_filtered, peaks_left, sample_rate)
-
-    warnings = []
-    if len(valid_peaks_left) != len(valid_peaks_right):
-        warnings.append("Left and right found a different number of peaks (%d vs %d)."
-                        % (len(valid_peaks_left), len(valid_peaks_right)))
-
-    rep_count = reps or len(valid_peaks_right)
-    if not rep_count:
-        warnings.append("No reps detected.")
-        return {"reps": [], "warnings": warnings, "version": VERSION}
+    try:
+        with quiet(plot):
+            results = VelocityCalculations.calculate_velocity3(
+                magnitude, t_sec, speed_type, reps=reps, magnitude_raw=raw, window_size=WINDOW_SIZE)
+    except IndexError as err:
+        # Their drift step looks for the bar being racked (a big spike) after
+        # the first 5 s to find where the set ends; without it, this fails.
+        raise ValueError("Couldn't find the end of the set. Start recording standing still for a few seconds, "
+                         "and press Stop only after the bar is back in the rack. (%s)" % err) from None
 
     # ============================================================
-    # Velocity for every repetition
+    # One row per rep (was: results.json)
     # ============================================================
 
-    WINDOW_SIZE = 15
-    results_right = VelocityCalculations.calculate_velocity3(
-        magnitude_right_filtered, t_right_sec, reps=rep_count, window_size=WINDOW_SIZE, plot=plot)
-    results_left = VelocityCalculations.calculate_velocity3(
-        magnitude_left_filtered, t_left_sec, reps=rep_count, window_size=WINDOW_SIZE, plot=plot)
-
-    if plot:
-        plot_peaks(t_right_sec, magnitude_right_filtered, valid_peaks_right,
-                   t_left_sec, magnitude_left_filtered, valid_peaks_left)
-
-    # ============================================================
-    # One row per rep (was: output.json)
-    # ============================================================
-
-    count = max(len(results_left["average_velocities"]), len(results_right["average_velocities"]))
+    average_v = results["average_velocities"]
+    peak_v = results["peak_velocities"]
     rows = []
-    for i in range(count):
-        row = {"rep_index": i + 1, "metrics": {}}
-        for side, res in (("left", results_left), ("right", results_right)):
-            if i < len(res["average_velocities"]):
-                row[side + "_mean_velocity"] = float(res["average_velocities"][i])
-                row[side + "_peak_velocity"] = float(res["peak_velocities"][i])
-                row["metrics"][side + "_start_s"] = float(res["all_time"][i][0])
-                row["metrics"][side + "_end_s"] = float(res["all_time"][i][-1])
-        rows.append(row)
-    if count != rep_count:
-        warnings.append("Expected %d reps (%s), velocity step found %d." % (
-            rep_count, "reported" if reps else "detected peaks", count))
+    for i in range(len(average_v)):
+        rows.append({
+            "rep_index": i + 1,
+            side + "_mean_velocity": float(average_v[i]),
+            side + "_peak_velocity": float(peak_v[i]) if i < len(peak_v) else None,
+            "metrics": {"sensor_used": side, "speed_type": speed_type},
+        })
+    if len(rows) != reps:
+        warnings.append("Expected %d reps (reported), found %d." % (reps, len(rows)))
     return {"reps": rows, "warnings": warnings, "version": VERSION}
 
 
-def plot_peaks(t_right_sec, magnitude_right, peaks_right, t_left_sec, magnitude_left, peaks_left):
-    fig, (ax_right, ax_left) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
-    for ax, t, mag, peaks, name in ((ax_right, t_right_sec, magnitude_right, peaks_right, "RIGHT"),
-                                    (ax_left, t_left_sec, magnitude_left, peaks_left, "LEFT")):
-        ax.plot(t, mag, label="Filtered acceleration")
-        if len(peaks):
-            ax.plot(t[peaks], mag[peaks], "x", markersize=10, label="Detected peaks")
-        ax.set_ylabel("Acceleration [m/s²]")
-        ax.set_title(name + " Sensor - Acceleration with Detected Peaks")
-        ax.legend()
-        ax.grid(True)
-    ax_left.set_xlabel("Time [s]")
-    plt.tight_layout()
-    plt.show()
+@contextlib.contextmanager
+def quiet(plot):
+    """Their velocity step always plots and prints debug output. Without
+    plot=True: no plot windows (and none on Azure), prints swallowed, and a
+    stop if the rep search can't find enough reps (it would loop forever)."""
+    if plot:
+        yield
+        return
+    real_show, real_find_peaks = plt.show, VelocityCalculations.find_peaks
+
+    def guarded_find_peaks(x, *args, **kwargs):
+        height = kwargs.get("height")
+        if isinstance(height, (int, float)) and height < -10:
+            raise ValueError("Couldn't find the reported number of reps in the recording.")
+        return real_find_peaks(x, *args, **kwargs)
+
+    plt.show = lambda *a, **k: None
+    VelocityCalculations.find_peaks = guarded_find_peaks
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):
+            yield
+    finally:
+        plt.show = real_show
+        VelocityCalculations.find_peaks = real_find_peaks
+        plt.close("all")
