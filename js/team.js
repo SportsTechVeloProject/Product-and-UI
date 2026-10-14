@@ -121,6 +121,8 @@ function renderTeamPage() {
   loadTeamDetails();
   loadRoster();
   loadStats();
+  loadWeeklyVolume();
+  loadTopPrs();
   loadSentInvites();
   if (staff) loadJoinRequests();
 }
@@ -272,6 +274,122 @@ function personRow(m) {
 
 /* ---- stats ---- */
 var lastStats = [];
+var lastWeeks = null; // [{ week_start: "YYYY-MM-DD", total_kg, sets, athletes }], oldest first
+
+// Display name for an exercise key from sessions ("back_squat" -> "Back squat").
+function exerciseName(key) {
+  var ex = EXERCISE_BY_KEY[key];
+  return ex ? ex.name : key;
+}
+
+function localDayString(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+
+// Kilos per week for the last 5 weeks (team_weekly_volume in
+// supabase/migrations/2026-10-14-team-stats.sql). Team totals only.
+function loadWeeklyVolume() {
+  var teamId = currentTeam.team_id;
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  sb.rpc("team_weekly_volume", { p_team: teamId, p_tz: tz, p_weeks: 5 }).then(function (res) {
+    if (!currentTeam || currentTeam.team_id !== teamId) return;
+    lastWeeks = res.error ? null : (res.data || []);
+    renderStatTiles();
+  });
+}
+
+// This week's kilos against the average of the earlier weeks, scaled to how
+// far into the week we are. Arrow: more than 5% ahead / behind that pace.
+// Earlier weeks count from the first week the team logged anything, so a
+// new team isn't compared with empty weeks before it started.
+var PACE_MARGIN = 0.05;
+function weeklyTile() {
+  var now = new Date();
+  var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
+  var thisWeekKey = localDayString(monday);
+  var byWeek = {};
+  lastWeeks.forEach(function (w) { byWeek[w.week_start] = Number(w.total_kg); });
+  var thisWeek = byWeek[thisWeekKey] || 0;
+
+  var earlier = [];
+  for (var i = 4; i >= 1; i--) {
+    var key = localDayString(new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - 7 * i));
+    if (earlier.length || byWeek[key]) earlier.push(byWeek[key] || 0);
+  }
+  if (!earlier.length) return statTile("Lifted this week", formatKg(thisWeek), "No earlier weeks to compare with yet");
+
+  var avg = earlier.reduce(function (a, b) { return a + b; }, 0) / earlier.length;
+  var share = (now - monday) / (7 * 86400000);
+  var expected = avg * share;
+  var arrow = "\u2192", state = "on", text = "On pace";
+  if (expected > 0 && thisWeek > expected * (1 + PACE_MARGIN)) { arrow = "\u2191"; state = "up"; text = "Ahead of pace"; }
+  else if (thisWeek < expected * (1 - PACE_MARGIN)) { arrow = "\u2193"; state = "down"; text = "Behind pace"; }
+
+  var tile = statTile("Lifted this week", formatKg(thisWeek),
+    text + " \u00b7 avg " + formatKg(avg) + "/week (last " + earlier.length + " week" + (earlier.length === 1 ? "" : "s") + ")");
+  var value = tile.querySelector(".stat-value");
+  value.appendChild(el("span", "pace-arrow pace-" + state, " " + arrow));
+  tile.title = "By now in an average week the team has lifted about " + formatKg(expected) + ".";
+  return tile;
+}
+
+/* ---- Top PRs (team_top_lifts) ---- */
+function loadTopPrs() {
+  var teamId = currentTeam.team_id;
+  var box = authEl("topPrs");
+  box.innerHTML = "";
+  box.appendChild(el("p", "log-note", "Loading\u2026"));
+  var mins = SPEED_ZONES.slice(0, -1).map(function (z) { return z.min; });
+  sb.rpc("team_top_lifts", { p_team: teamId, p_zone_mins: mins, p_per_zone: 3 }).then(function (res) {
+    if (!currentTeam || currentTeam.team_id !== teamId) return;
+    box.innerHTML = "";
+    if (res.error) { box.appendChild(el("p", "log-note", res.error.message)); return; }
+    // Only the lifts V-Lo analyses (not test recordings).
+    var rows = (res.data || []).filter(function (r) { return analyzedLift(EXERCISE_BY_KEY[r.exercise]); });
+    if (!rows.length) { box.appendChild(el("p", "log-note", "No sensor-recorded sets with a measured bar speed yet.")); return; }
+
+    var byExercise = {};
+    rows.forEach(function (r) { (byExercise[r.exercise] = byExercise[r.exercise] || []).push(r); });
+    Object.keys(byExercise).sort(function (a, b) { return exerciseName(a).localeCompare(exerciseName(b)); }).forEach(function (key) {
+      var section = el("div", "pr-exercise");
+      section.appendChild(el("h4", "pr-exercise-name", exerciseName(key)));
+      var grid = el("div", "pr-zones");
+      SPEED_ZONES.forEach(function (zone, idx) {
+        var col = el("div", "pr-zone");
+        var head = el("p", "pr-zone-name");
+        var swatch = el("span", "swatch");
+        swatch.style.background = "var(--zone-" + (idx + 1) + ")";
+        head.appendChild(swatch);
+        head.appendChild(document.createTextNode(zone.label));
+        col.appendChild(head);
+        var list = el("ol", "pr-list");
+        byExercise[key].filter(function (r) { return r.zone_idx === idx; }).forEach(function (r) {
+          var li = el("li", "pr-row");
+          var isMe = currentUser && r.user_id === currentUser.id;
+          li.appendChild(el("span", "pr-rank", String(r.rank)));
+          li.appendChild(avatar(r.full_name, isMe));
+          var who = el("span", "pr-who");
+          who.appendChild(el("span", "person-name", r.full_name + (isMe ? " (you)" : "")));
+          var when = new Date(r.recorded_at);
+          who.appendChild(el("span", "person-meta",
+            when.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + ", " +
+            when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })));
+          li.appendChild(who);
+          var nums = el("span", "pr-nums");
+          nums.appendChild(el("span", "pr-kg", formatKg(Number(r.weight_kg))));
+          nums.appendChild(el("span", "person-meta", Number(r.mean_velocity).toFixed(2) + " m/s avg"));
+          li.appendChild(nums);
+          list.appendChild(li);
+        });
+        if (!list.children.length) col.appendChild(el("p", "log-note", "No sets yet."));
+        else col.appendChild(list);
+        grid.appendChild(col);
+      });
+      section.appendChild(grid);
+      box.appendChild(section);
+    });
+  });
+}
 
 function loadStats() {
   sb.rpc("team_stats", { p_team: currentTeam.team_id }).then(function (res) {
@@ -301,6 +419,7 @@ function renderStatTiles() {
   var totalKg = lastStats.reduce(function (sum, r) { return sum + Number(r.total_kg || 0); }, 0);
   var sessions = lastStats.reduce(function (sum, r) { return sum + r.sessions; }, 0);
   box.appendChild(statTile("Total lifted", formatKg(totalKg), sessions + " session" + (sessions === 1 ? "" : "s") + " · load × reps"));
+  if (lastWeeks) box.appendChild(weeklyTile());
 
   var speed = el("div", "stat-tile stat-tile-wide");
   speed.appendChild(el("p", "stat-label", "Average bar speed per lift"));
@@ -308,7 +427,7 @@ function renderStatTiles() {
   if (!withSpeed.length) speed.appendChild(el("p", "stat-sub", "No rep data yet."));
   withSpeed.forEach(function (r) {
     var row = el("p", "stat-row");
-    row.appendChild(el("span", "", r.exercise));
+    row.appendChild(el("span", "", exerciseName(r.exercise)));
     row.appendChild(el("span", "mono", Number(r.avg_mean_velocity).toFixed(2) + " m/s"));
     speed.appendChild(row);
   });
