@@ -176,7 +176,7 @@ function renderVelocityChart(ex, sim, target, selectedRep) {
     legend.innerHTML = "";
     if (selectedRep === null) {
       ex.zones.forEach(function (z, zi) {
-        var inSet = sim.velocities.some(function (v) { return zoneFor(ex, v) === z.label; });
+        var inSet = sim.velocities.some(function (v) { return zoneFor(ex, v) === z.key; });
         if (!inSet) return;
         var item = document.createElement("span");
         item.innerHTML = '<i style="background:var(--zone-' + (zi + 1) + ')"></i>' + z.label;
@@ -443,7 +443,7 @@ function renderRepZones(ex, sim) {
     chip.innerHTML =
       '<span class="rn">Rep ' + (i + 1) + '</span>' +
       '<span class="rv">' + v.toFixed(2) + ' m/s</span>' +
-      '<button type="button" class="rz zone-link" data-zone="' + zoneFor(ex, v) + '">' + zoneFor(ex, v) + '</button>' +
+      '<button type="button" class="rz zone-link" data-zone="' + zoneFor(ex, v) + '">' + zoneLabel(zoneFor(ex, v)) + '</button>' +
       (repUneven(sim, i)
         ? '<span class="rep-flag" title="Left ' + Number(sim.left[i]).toFixed(2) + ' m/s · right ' + Number(sim.right[i]).toFixed(2) + ' m/s">Uneven left/right</span>'
         : "");
@@ -490,7 +490,7 @@ function renderHistory(exKey, ex, selectedIdx) {
       '<td class="num">' + (row.weight === null ? "—" : row.weight + " kg") + "</td>" +
       '<td class="num">' + sim.reps + "</td>" +
       '<td class="num">' + (v1 === undefined ? "—" : v1.toFixed(2) + " m/s") + "</td>" +
-      "<td>" + (zone ? '<button type="button" class="zone-link" data-zone="' + zone + '">' + zone + "</button>" : "—") + "</td>";
+      "<td>" + (zone ? '<button type="button" class="zone-link" data-zone="' + zone + '">' + zoneLabel(zone) + "</button>" : "—") + "</td>";
     tr.addEventListener("click", function () { selectSet(exKey, idx); });
     body.appendChild(tr);
   });

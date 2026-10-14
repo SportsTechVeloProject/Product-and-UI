@@ -142,7 +142,7 @@ document.getElementById("exitDemo2").addEventListener("click", function (e) { e.
 document.getElementById("exitDemo3").addEventListener("click", function (e) { e.preventDefault(); closeDemo(); });
 
 /* ---------------- zone info modal ---------------- */
-function renderZoneTabs(activeLabel) {
+function renderZoneTabs(active) {
   var ex = EXERCISES[state.ex];
   var tabs = document.getElementById("zoneModalTabs");
   tabs.innerHTML = "";
@@ -151,16 +151,18 @@ function renderZoneTabs(activeLabel) {
     b.type = "button";
     b.className = "zone-tab";
     b.textContent = z.label;
-    b.setAttribute("aria-selected", z.label === activeLabel ? "true" : "false");
-    b.addEventListener("click", function () { showZoneContent(z.label); });
+    b.dataset.zone = z.key;
+    b.setAttribute("aria-selected", z.key === zoneKey(active) ? "true" : "false");
+    b.addEventListener("click", function () { showZoneContent(z.key); });
     tabs.appendChild(b);
   });
 }
-function showZoneContent(label) {
+function showZoneContent(zone) {
   var ex = EXERCISES[state.ex];
-  var idx = ex.zones.findIndex(function (z) { return z.label === label; });
+  var key = zoneKey(zone);
+  var idx = ex.zones.findIndex(function (z) { return z.key === key; });
   if (idx < 0) idx = 0;
-  var info = ZONE_INFO[ex.zones[idx].label];
+  var info = ZONE_INFO[ex.zones[idx].key];
   document.getElementById("zoneModalRange").textContent = ex.name + " · " + zoneRangeLabel(ex, idx) + " · " + info.pct;
   document.getElementById("zoneModalTitle").textContent = ex.zones[idx].label;
   document.getElementById("zoneModalDesc").textContent = info.desc;
@@ -180,12 +182,12 @@ function showZoneContent(label) {
     parts.appendChild(tr);
   });
   document.querySelectorAll(".zone-tab").forEach(function (b) {
-    b.setAttribute("aria-selected", b.textContent === ex.zones[idx].label ? "true" : "false");
+    b.setAttribute("aria-selected", b.dataset.zone === ex.zones[idx].key ? "true" : "false");
   });
 }
-function openZoneModal(label) {
-  renderZoneTabs(label);
-  showZoneContent(label);
+function openZoneModal(zone) {
+  renderZoneTabs(zone);
+  showZoneContent(zone);
   document.getElementById("zoneModalOverlay").hidden = false;
 }
 function closeZoneModal() {

@@ -137,18 +137,13 @@ function parseExerciseLine(raw) {
   });
 
   // 3b. training zone the coach wants the sets in — velocity-based planning:
-  // "Back squat 5x3 power", "zone: absolute strength", "@starting strength".
-  // Multi-word names count anywhere on the line. Single words (power,
-  // speed, absolute, and older/short names) only count when marked with
-  // "zone:"/"@", followed by "zone", or last on the line, so "Power clean
-  // 3x3" or "3x5 slow eccentric" aren't read as zones. Older zone names
-  // from earlier plans still read.
-  function zoneName(word) {
-    var z = fold(word).replace(/[^a-z]+/g, " ").trim();
-    if (z === "speed" || /^(starting|fast|explosiv)/.test(z)) return "Starting Strength / Speed";
-    if (/^(absolute|slow|max)/.test(z)) return "Absolute Strength";
-    return "Power"; // power, medium, traditional, speed-strength, strength-speed, accelerative
-  }
+  // "Back squat 5x3 power", "zone: absolute strength", "@starting strength",
+  // or the keys: "zone: slow". Multi-word names count anywhere on the line.
+  // Single words (power, speed, absolute, fast/medium/slow, older names)
+  // only count when marked with "zone:"/"@", followed by "zone", or last on
+  // the line, so "Power clean 3x3" or "3x5 slow eccentric" aren't read as
+  // zones. Saved as the key (fast / medium / slow); see zoneKey in core.js.
+  var zoneName = zoneKey;
   var gotZone = take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(starting\s+strength(?:\s*\/\s*speed)?|absolute\s+strength|speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
     item.zone = zoneName(m[1]);
   });
@@ -1360,13 +1355,13 @@ function renderPlanItem(item) {
     var line = "Prescribed velocity " + band + " m/s";
     if (item.lift) {
       var zex = EXERCISES[item.lift.key];
-      line += " · " + zoneFor(zex, item.velocity.max || item.velocity.min);
+      line += " · " + zoneLabel(zoneFor(zex, item.velocity.max || item.velocity.min));
     }
     wrap.appendChild(el("p", "plan-item-vbt", line));
   }
   if (item.zone) {
     var zr = item.lift ? zoneRange(EXERCISES[item.lift.key], item.zone) : null;
-    wrap.appendChild(el("p", "plan-item-vbt", "Zone: " + item.zone +
+    wrap.appendChild(el("p", "plan-item-vbt", "Zone: " + zoneLabel(item.zone) +
       (zr ? " · aim " + zr.lo.toFixed(2) + "–" + zr.hi.toFixed(2) + " m/s; the weight is suggested from the athlete's own sets" : "")));
   }
   if (item.velocityLoss != null) {
@@ -1379,7 +1374,7 @@ function renderPlanItem(item) {
     var ex = EXERCISES[item.lift.key];
     var sim = simulateSet(kg, ex);
     wrap.appendChild(el("p", "plan-item-tempo",
-      "Target first-rep speed ≈ " + sim.v1.toFixed(2) + " m/s · " + zoneFor(ex, sim.v1) +
+      "Target first-rep speed ≈ " + sim.v1.toFixed(2) + " m/s · " + zoneLabel(zoneFor(ex, sim.v1)) +
       " · " + Math.round(sim.pct) + "% of est. 1RM"));
 
     // A coach can prescribe both a load and a velocity. When the load's own
@@ -1412,15 +1407,15 @@ function renderPlanItem(item) {
   return wrap;
 }
 
-// What a block of each type should mostly consist of, by velocity zone.
+// What a block of each type should mostly consist of, by velocity zone (keys).
 var BLOCK_EXPECTATION = {
-  hypertrophy: ["Power"],
-  strength: ["Absolute Strength", "Power"],
-  peaking: ["Absolute Strength"],
-  power: ["Starting Strength / Speed", "Power"],
-  speed: ["Starting Strength / Speed", "Power"],
-  "off season": ["Power"],
-  "in season": ["Starting Strength / Speed", "Power"]
+  hypertrophy: ["medium"],
+  strength: ["slow", "medium"],
+  peaking: ["slow"],
+  power: ["fast", "medium"],
+  speed: ["fast", "medium"],
+  "off season": ["medium"],
+  "in season": ["fast", "medium"]
 };
 
 var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
@@ -1429,7 +1424,7 @@ var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
 // The zone a prescribed item lands in — from the coach's own velocity target
 // where there is one, otherwise from the load.
 function itemZone(item) {
-  if (item.zone) return item.zone;
+  if (item.zone) return zoneKey(item.zone);
   if (!item.lift) return null;
   var ex = EXERCISES[item.lift.key];
   if (item.velocity) return zoneFor(ex, item.velocity.max || item.velocity.min);
@@ -1472,7 +1467,7 @@ function renderBlock(plan, zoneCounts) {
     ? share + "% of the measurable work sits in the zones a " + plan.meta["block type"].toLowerCase() +
       " block is built on."
     : "Only " + share + "% of the measurable work is in the zones a " + plan.meta["block type"].toLowerCase() +
-      " block is built on — most of it is " + dominant.toLowerCase() + ".";
+      " block is built on — most of it is " + zoneLabel(dominant) + ".";
   host.appendChild(note);
 }
 

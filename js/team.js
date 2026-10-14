@@ -729,7 +729,7 @@ var TODAY_STATUS = { done: "\u2713 Done", started: "In progress", todo: "Not sta
 function planItemText(item) {
   var scheme = item.sets && item.repsText ? item.sets + "\u00d7" + item.repsText : (item.repsText || (item.sets ? item.sets + " sets" : ""));
   var text = item.name + (scheme ? " " + scheme : "");
-  return item.zone ? text + " \u00b7 " + item.zone : text;
+  return item.zone ? text + " \u00b7 " + zoneLabel(item.zone) : text;
 }
 
 function renderTodayAthlete(workouts, logsToday, next) {
@@ -1250,7 +1250,7 @@ function speedHistoryChart(title, sets) {
     var tip = svgEl("title", {});
     tip.textContent = new Date(p.t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + "\n" +
       (p.kg === null ? "" : formatKg(p.kg) + (p.reps ? " \u00d7 " + p.reps : "") + "\n") +
-      p.v.toFixed(2) + " m/s \u00b7 " + zoneFor(ex, p.v);
+      p.v.toFixed(2) + " m/s \u00b7 " + zoneLabel(zoneFor(ex, p.v));
     dot.appendChild(tip);
     svg.appendChild(dot);
   });

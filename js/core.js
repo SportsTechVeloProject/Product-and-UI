@@ -5,11 +5,34 @@
 /* ---------------- data model ---------------- */
 // Speed zones, fastest first, by a set's mean bar speed. The same limits for
 // every lift for now; give a lift its own list in EXERCISES if that changes.
+//   key   — what the code uses and what's saved (plans, recordings): fast /
+//           medium / slow, the same words as the data team's analysis TYPE.
+//   label — what the website shows.
 var SPEED_ZONES = [
-  { min: 1.30, label: "Starting Strength / Speed" },
-  { min: 0.50, label: "Power" },
-  { min: 0,    label: "Absolute Strength" }
+  { key: "fast",   min: 1.30, label: "Starting Strength / Speed" },
+  { key: "medium", min: 0.50, label: "Power" },
+  { key: "slow",   min: 0,    label: "Absolute Strength" }
 ];
+
+// Any zone name -> its key, or null. Accepts the keys, the labels, and the
+// names used before (plans saved earlier may hold them): speed-strength,
+// strength-speed, accelerative -> medium; maximal -> slow; explosive -> fast.
+function zoneKey(name) {
+  if (!name) return null;
+  var z = String(name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]+/g, " ").trim();
+  if (!z) return null;
+  if (z === "fast" || z === "speed" || /^(starting|explosiv)/.test(z)) return "fast";
+  if (z === "slow" || /^(absolute|max)/.test(z)) return "slow";
+  if (z === "medium" || /^(power|traditional|speed strength|strength speed|accelerative)/.test(z)) return "medium";
+  return null;
+}
+
+// What the website shows for a zone (any name accepted); unknown names as they are.
+function zoneLabel(name) {
+  var key = zoneKey(name);
+  var zone = SPEED_ZONES.filter(function (z) { return z.key === key; })[0];
+  return zone ? zone.label : (name || "");
+}
 
 // Fictional lifter, fictional load-velocity profile per lift.
 // V(%1RM) = a - b * (%1RM/100), calibrated so V(100%) = v1RM (approx. published VBT anchors).
@@ -70,11 +93,11 @@ var EXERCISES = {
   }
 };
 
-// What each zone means. pct = rough share of 1RM. parts = the classic
+// What each zone means, by zone key. pct = rough share of 1RM. parts = the classic
 // velocity zones a zone is made of (shown in the zone popup), from the
 // widely used VBT zone chart (e.g. GymAware's velocity zones).
 var ZONE_INFO = {
-  "Starting Strength / Speed": {
+  fast: {
     pct: "0–30% of 1RM",
     desc: "Very light loads, or none, moved as fast as you possibly can: speed work, jumps and throws.",
     benefit: "Trains the nervous system to get force going quickly from a standstill. Builds explosiveness and bar acceleration, but does little on its own to raise your 1RM.",
@@ -82,7 +105,7 @@ var ZONE_INFO = {
       { name: "Starting strength", pct: "0–30%", speed: "> 1.30 m/s" }
     ]
   },
-  "Power": {
+  medium: {
     pct: "30–80% of 1RM",
     desc: "Light-to-heavy loads lifted with intent to move fast. Most of a training block's volume lives here.",
     benefit: "Builds strength, muscle and the ability to move heavy weight quickly: the bridge between speed and maximal strength.",
@@ -93,7 +116,7 @@ var ZONE_INFO = {
       { name: "Accelerative strength", pct: "70–80%", speed: "0.75–0.50 m/s" }
     ]
   },
-  "Absolute Strength": {
+  slow: {
     pct: "80–100% of 1RM",
     desc: "Heavy loads: triples, doubles and near-maximal singles. The bar slows down, but the intent to accelerate stays.",
     benefit: "Builds maximal strength and grooves technique under competition-like loads. Essential for peaking, but taxing on the nervous system, so use it with care.",
@@ -126,9 +149,9 @@ function zoneColor(ex, v) {
 // zone has no upper limit (nor the bottom one a lower), so those two get a
 // band of ZONE_OPEN_BAND for aiming. Zone limits live in EXERCISES above.
 var ZONE_OPEN_BAND = 0.2;
-function zoneRange(ex, label) {
-  var idx = -1;
-  ex.zones.forEach(function (z, i) { if (z.label === label) idx = i; });
+function zoneRange(ex, zone) {
+  var key = zoneKey(zone), idx = -1;
+  ex.zones.forEach(function (z, i) { if (z.key === key) idx = i; });
   if (idx === -1) return null;
   var lo = ex.zones[idx].min;
   var hi = idx === 0 ? lo + ZONE_OPEN_BAND : ex.zones[idx - 1].min;
@@ -152,11 +175,12 @@ function isUneven(left, right) {
   return m !== null && m > LR_MISMATCH_LIMIT;
 }
 
+// The zone key (fast / medium / slow) a speed falls in. Show it with zoneLabel().
 function zoneFor(ex, v) {
   for (var i = 0; i < ex.zones.length; i++) {
-    if (v >= ex.zones[i].min) return ex.zones[i].label;
+    if (v >= ex.zones[i].min) return ex.zones[i].key;
   }
-  return ex.zones[ex.zones.length - 1].label;
+  return ex.zones[ex.zones.length - 1].key;
 }
 
 // Deterministic set simulator: given a load, derive first-rep velocity from

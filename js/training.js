@@ -619,7 +619,7 @@ function exerciseCard(w, item, itemIndex, readOnly) {
   if (item.velocity) {
     var band = item.velocity.max ? item.velocity.min.toFixed(2) + "–" + item.velocity.max.toFixed(2) : item.velocity.min.toFixed(2);
     card.appendChild(el("p", "plan-item-vbt", "Aim for " + band + " m/s" +
-      (info.lift ? " · " + zoneFor(EXERCISES[info.lift], item.velocity.max || item.velocity.min) : "")));
+      (info.lift ? " · " + zoneLabel(zoneFor(EXERCISES[info.lift], item.velocity.max || item.velocity.min)) : "")));
   }
   if (item.note) card.appendChild(el("p", "plan-item-note", "Coach: " + item.note));
 
@@ -633,7 +633,7 @@ function exerciseCard(w, item, itemIndex, readOnly) {
   }
   var points = range ? liftPoints(training.history, info.key) : [];
   if (item.zone && range) {
-    card.appendChild(withTip(el("p", "training-zone", "Zone: " + item.zone + " · aim " + range.lo.toFixed(2) + "–" + range.hi.toFixed(2) +
+    card.appendChild(withTip(el("p", "training-zone", "Zone: " + zoneLabel(item.zone) + " · aim " + range.lo.toFixed(2) + "–" + range.hi.toFixed(2) +
       " m/s, the average speed of the set's reps "), TIPS.zone));
   }
   if (info.recordable && !readOnly) {
