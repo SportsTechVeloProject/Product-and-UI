@@ -115,6 +115,15 @@ function showPlansTab(tab) {
   document.getElementById("trainingView").hidden = tab !== "training";
   document.getElementById("planBuilderView").hidden = tab !== "builder";
   if (tab === "training") loadTraining();
+  updateSensorBar();
+}
+
+// The sensor panel is for recording your own sets. Hidden while a coach
+// looks at an athlete's training: it's read-only, and a recording would be
+// saved to the coach's account, not the athlete's.
+function updateSensorBar() {
+  var readOnlyTraining = !document.getElementById("plansView").hidden && training.tab === "training" && trainingReadOnly();
+  document.getElementById("sensorBar").hidden = readOnlyTraining;
 }
 
 function trainingVisible() {
@@ -149,6 +158,8 @@ function loadTraining() {
   if (!sb || !currentUser) return;
   var athleteId = training.athleteId || currentUser.id;
   var readOnly = trainingReadOnly();
+  updateSensorBar();
+  document.getElementById("plansTabTraining").textContent = readOnly ? training.athleteName + "'s training" : "My training";
   document.getElementById("trainingEyebrow").textContent = readOnly ? "Read-only · as " + training.athleteName + " sees it" : "My training";
   document.getElementById("trainingHeading").textContent = readOnly ? training.athleteName + "'s training" : "Your workouts";
   document.getElementById("trainingBackRow").hidden = !readOnly;
