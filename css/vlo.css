@@ -585,6 +585,18 @@
     min-width: 0;
   }
   #progressSummary .stat-tile { background: var(--bg); }
+  .progress-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 14px; }
+  .progress-charts:empty { display: none; }
+  .progress-chart { border: 1px solid var(--border); border-radius: 4px; padding: 14px; background: var(--bg); min-width: 0; }
+  .progress-svg { display: block; width: 100%; height: auto; margin-top: 8px; }
+  .progress-grid { stroke: var(--border); stroke-width: 1; }
+  .progress-axis { fill: var(--muted); font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .progress-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 6px; font-size: 0.78rem; color: var(--muted); }
+  .progress-legend-item { display: inline-flex; align-items: center; }
+  .progress-legend .swatch { margin-right: 6px; }
+  .progress-line { fill: none; stroke: var(--fg); stroke-width: 1.5; opacity: 0.5; }
+  .progress-dot { stroke: var(--bg); stroke-width: 2; cursor: default; }
+  .progress-dot:hover { stroke: var(--fg); }
   .stat-tile-wide { grid-column: span 2; }
   .stat-label { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .stat-value { font-family: 'Big Shoulders Display', sans-serif; font-weight: 700; font-size: 1.9rem; margin-top: 4px; }

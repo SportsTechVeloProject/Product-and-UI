@@ -682,6 +682,7 @@ function showProgress(member) {
   card.hidden = false;
   authEl("progressName").textContent = member.full_name;
   authEl("progressSummary").innerHTML = "";
+  authEl("progressCharts").innerHTML = "";
   authEl("progressRows").innerHTML = "";
   authEl("progressStatus").textContent = "Loading…";
   card.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -714,7 +715,14 @@ function showProgress(member) {
           var diff = latest.meanSpeed - first.meanSpeed;
           sub += " · speed " + (diff >= 0 ? "+" : "") + diff.toFixed(2) + " m/s since first";
         }
-        authEl("progressSummary").appendChild(statTile(exercise, "Best " + formatKg(best), sub));
+        authEl("progressSummary").appendChild(statTile(exerciseName(exercise), "Best " + formatKg(best), sub));
+      });
+
+      // Speed-over-time chart for each lift with measured reps.
+      Object.keys(byExercise).sort().forEach(function (exercise) {
+        if (!analyzedLift(EXERCISE_BY_KEY[exercise])) return;
+        var points = byExercise[exercise].filter(function (s) { return s.meanSpeed !== null; });
+        if (points.length) authEl("progressCharts").appendChild(speedHistoryChart(exerciseName(exercise), points));
       });
 
       // One row per set; clicking it opens that set's reps underneath.
@@ -724,7 +732,7 @@ function showProgress(member) {
         tr.tabIndex = 0;
         tr.setAttribute("aria-expanded", "false");
         tr.appendChild(el("td", "", formatDate(s.recorded_at)));
-        tr.appendChild(el("td", "", s.exercise));
+        tr.appendChild(el("td", "", exerciseName(s.exercise)));
         tr.appendChild(el("td", "num", s.weight_kg === null ? "—" : formatKg(Number(s.weight_kg))));
         tr.appendChild(el("td", "num", String(s.repCount)));
         tr.appendChild(el("td", "num", s.meanSpeed === null ? "—" : s.meanSpeed.toFixed(2) + " m/s"));
@@ -750,6 +758,80 @@ function showProgress(member) {
         });
       });
     });
+}
+
+// Chart of one lift's average set speed over time, with the speed zones as
+// faint bands behind. Each dot is a set, coloured by its zone; hovering shows
+// date, weight × reps and speed. sets: [{ recorded_at, weight_kg, repCount, meanSpeed }].
+function speedHistoryChart(title, sets) {
+  var card = el("div", "progress-chart");
+  card.appendChild(el("p", "stat-label", title + " \u00b7 average set speed"));
+  var pts = sets.map(function (s) {
+    return { t: new Date(s.recorded_at).getTime(), v: s.meanSpeed, kg: s.weight_kg === null ? null : Number(s.weight_kg), reps: s.repCount };
+  }).sort(function (a, b) { return a.t - b.t; });
+
+  var W = 600, H = 210, m = { l: 44, r: 12, t: 12, b: 28 };
+  var maxV = Math.max.apply(null, pts.map(function (p) { return p.v; }));
+  var yMax = Math.max(1, Math.ceil((maxV + 0.1) * 4) / 4);
+  var t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  var span = t1 - t0 || 86400000;
+  function x(t) { return pts.length === 1 ? (m.l + W - m.r) / 2 : m.l + (t - t0) / span * (W - m.l - m.r); }
+  function y(v) { return m.t + (1 - v / yMax) * (H - m.t - m.b); }
+
+  var svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, class: "progress-svg", role: "img",
+                           "aria-label": title + ": average set speed over time" });
+  // zone bands, fastest at the top
+  SPEED_ZONES.forEach(function (z, i) {
+    var hi = i === 0 ? yMax : Math.min(SPEED_ZONES[i - 1].min, yMax);
+    if (z.min >= yMax) return;
+    svg.appendChild(svgEl("rect", { x: m.l, y: y(hi), width: W - m.l - m.r, height: y(z.min) - y(hi),
+                                    style: "fill: var(--zone-" + (i + 1) + "); opacity: 0.09" }));
+  });
+  // y axis: a line and label every 0.25 m/s
+  for (var v = 0; v <= yMax + 1e-9; v += 0.25) {
+    svg.appendChild(svgEl("line", { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: "progress-grid" }));
+    var t = svgEl("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", class: "progress-axis" });
+    t.textContent = v.toFixed(2);
+    svg.appendChild(t);
+  }
+  // x axis: first and last date
+  function dateLabel(time, anchor, xPos) {
+    var d = svgEl("text", { x: xPos, y: H - 8, "text-anchor": anchor, class: "progress-axis" });
+    d.textContent = new Date(time).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    svg.appendChild(d);
+  }
+  dateLabel(t0, pts.length === 1 ? "middle" : "start", x(t0));
+  if (pts.length > 1) dateLabel(t1, "end", x(t1));
+  // line through the sets, then a dot per set
+  if (pts.length > 1) {
+    svg.appendChild(svgEl("path", { d: pts.map(function (p, i) { return (i ? "L" : "M") + x(p.t).toFixed(1) + "," + y(p.v).toFixed(1); }).join(" "),
+                                    class: "progress-line" }));
+  }
+  var ex = { zones: SPEED_ZONES };
+  pts.forEach(function (p) {
+    var dot = svgEl("circle", { cx: x(p.t), cy: y(p.v), r: 5, class: "progress-dot", style: "fill: " + zoneColor(ex, p.v) });
+    var tip = svgEl("title", {});
+    tip.textContent = new Date(p.t).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + "\n" +
+      (p.kg === null ? "" : formatKg(p.kg) + (p.reps ? " \u00d7 " + p.reps : "") + "\n") +
+      p.v.toFixed(2) + " m/s \u00b7 " + zoneFor(ex, p.v);
+    dot.appendChild(tip);
+    svg.appendChild(dot);
+  });
+  card.appendChild(svg);
+  // legend: the zones shown as bands
+  var legend = el("p", "progress-legend");
+  SPEED_ZONES.forEach(function (z, i) {
+    if (z.min >= yMax) return;
+    var item = el("span", "progress-legend-item");
+    var sw = el("span", "swatch");
+    sw.style.background = "var(--zone-" + (i + 1) + ")";
+    item.appendChild(sw);
+    item.appendChild(document.createTextNode(z.label));
+    legend.appendChild(item);
+  });
+  card.appendChild(legend);
+  card.appendChild(el("p", "log-note", "Each dot is a set; hover for weight and speed. Heavier sets are naturally slower, so compare dots at similar weights."));
+  return card;
 }
 
 // The set's fastest rep by mean speed (left/right averaged): { rep, speed } or null.
