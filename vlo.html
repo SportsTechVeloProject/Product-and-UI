@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="css/vlo.css?v=9">
+<link rel="stylesheet" href="css/vlo.css?v=10">
 
 <div id="marketingView">
 <nav class="top">
@@ -24,6 +24,7 @@
       </button>
       <button type="button" class="profile-btn open-auth-btn is-logged-in" id="navProfileBtn" aria-label="Your account" hidden>
         <span class="profile-initial" id="navProfileInitial"></span>
+        <img class="profile-photo" id="navProfilePhoto" alt="" hidden>
       </button>
     </div>
   </div>
@@ -258,6 +259,7 @@
         <button type="button" class="profile-btn" id="profileBtn" aria-label="Log in">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.4-3.6 4.2-5.4 7.5-5.4s6.1 1.8 7.5 5.4"/></svg>
           <span class="profile-initial" id="profileInitial" hidden></span>
+          <img class="profile-photo" id="profilePhoto" alt="" hidden>
           <span class="profile-dot" id="profileDot" hidden></span>
         </button>
       </div>
@@ -546,8 +548,28 @@
 
     <section class="app-hero">
       <div>
-        <p class="eyebrow" id="teamEyebrow">Team</p>
-        <h2 id="teamHeading">Team</h2>
+        <div class="team-title-row">
+          <!-- Team picture (members only), or the team's initial in its colour. -->
+          <span class="team-logo" id="teamLogo" aria-hidden="true"></span>
+          <div>
+            <p class="eyebrow" id="teamEyebrow">Team</p>
+            <h2 id="teamHeading">Team</h2>
+          </div>
+        </div>
+        <!-- Coaches/admins: team picture and colour. -->
+        <button type="button" class="text-link team-look-toggle" id="teamLookToggle" hidden>Edit team look</button>
+        <div class="team-look" id="teamLookPanel" hidden>
+          <p class="team-desc-label">Team picture · only team members see it</p>
+          <div class="log-row">
+            <button type="button" class="btn-ghost" id="teamPhotoBtn">Upload picture</button>
+            <button type="button" class="btn-ghost" id="teamPhotoRemove" hidden>Remove picture</button>
+            <input type="file" id="teamPhotoInput" accept="image/jpeg,image/png,image/webp" hidden>
+          </div>
+          <p class="team-desc-label" style="margin-top:14px;">Team colour</p>
+          <div class="color-swatches" id="teamColorSwatches" role="radiogroup" aria-label="Team colour"></div>
+          <p class="log-note" id="teamLookStatus"></p>
+          <button type="button" class="text-link" id="teamLookDone">Done</button>
+        </div>
         <!-- Like a profile bio: public text first, members-only text below it. -->
         <div class="team-desc team-desc-public" data-desc="public_description" hidden></div>
         <div class="team-desc team-desc-private" data-desc="private_description" hidden></div>
@@ -799,6 +821,17 @@
       <p class="eyebrow">Account settings</p>
       <h3 id="accountTitle">Your account</h3>
       <p class="log-note" id="accountEmail" style="margin-top:6px;"></p>
+      <div class="account-photo">
+        <span class="person-avatar avatar-lg" id="accountAvatar" aria-hidden="true"></span>
+        <div>
+          <div class="log-row">
+            <button type="button" class="btn-ghost" id="accountPhotoBtn">Upload picture</button>
+            <button type="button" class="btn-ghost" id="accountPhotoRemove" hidden>Remove</button>
+          </div>
+          <input type="file" id="accountPhotoInput" accept="image/jpeg,image/png,image/webp" hidden>
+          <p class="log-note" id="accountPhotoStatus">Shown to your team instead of your initial.</p>
+        </div>
+      </div>
       <form id="accountForm" style="display:flex; flex-direction:column; gap:10px; margin-top:18px;">
         <label class="log-note" for="accountName">Name (shown to your team)</label>
         <div class="log-row">
@@ -817,18 +850,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Load order matters: core defines what the others use, app wires it together.
      ?v=N makes browsers that cached an older copy download the files again. -->
-<script src="js/core.js?v=9"></script>
-<script src="js/charts.js?v=9"></script>
-<script src="js/sensors.js?v=9"></script>
-<script src="js/exercises.js?v=9"></script>
-<script src="js/plans.js?v=9"></script>
-<script src="js/auth.js?v=9"></script>
-<script src="js/team.js?v=9"></script>
-<script src="js/mysets.js?v=9"></script>
-<script src="js/coachplans.js?v=9"></script>
-<script src="js/recorder.js?v=9"></script>
-<script src="js/recordings.js?v=9"></script>
-<script src="js/vbt.js?v=9"></script>
-<script src="js/training.js?v=9"></script>
-<script src="js/app.js?v=9"></script>
+<script src="js/core.js?v=10"></script>
+<script src="js/charts.js?v=10"></script>
+<script src="js/sensors.js?v=10"></script>
+<script src="js/exercises.js?v=10"></script>
+<script src="js/plans.js?v=10"></script>
+<script src="js/auth.js?v=10"></script>
+<script src="js/team.js?v=10"></script>
+<script src="js/mysets.js?v=10"></script>
+<script src="js/coachplans.js?v=10"></script>
+<script src="js/recorder.js?v=10"></script>
+<script src="js/recordings.js?v=10"></script>
+<script src="js/vbt.js?v=10"></script>
+<script src="js/training.js?v=10"></script>
+<script src="js/app.js?v=10"></script>
 </body></html>

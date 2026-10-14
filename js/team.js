@@ -92,6 +92,7 @@ function renderTeamPage() {
     authEl("teamEyebrow").textContent = "Team";
     authEl("teamHeading").textContent = "No team yet";
     renderDescriptions();
+    renderTeamLook();
     authEl("teamMain").hidden = true;
     authEl("teamNone").hidden = false;
     var loggedIn = !!currentUser;
@@ -106,6 +107,7 @@ function renderTeamPage() {
   authEl("teamEyebrow").textContent = "Your team · " + roleLabel(currentTeam.role);
   authEl("teamHeading").textContent = currentTeam.teamName;
   renderDescriptions();
+  renderTeamLook();
 
   var staff = isTeamStaff();
   if (!staff) authEl("joinRequestsCard").hidden = true;
@@ -132,14 +134,17 @@ function renderTeamPage() {
 // Refresh name and descriptions, in case a coach edited them since we loaded.
 function loadTeamDetails() {
   var teamId = currentTeam.team_id;
-  sb.from("teams").select("name, public_description, private_description").eq("id", teamId).maybeSingle().then(function (res) {
+  sb.from("teams").select("name, public_description, private_description, logo_path, color").eq("id", teamId).maybeSingle().then(function (res) {
     if (res.error || !res.data || !currentTeam || currentTeam.team_id !== teamId) return;
     currentTeam.teamName = res.data.name;
     currentTeam.public_description = res.data.public_description || "";
     currentTeam.private_description = res.data.private_description || "";
+    currentTeam.logo_path = res.data.logo_path || null;
+    currentTeam.color = res.data.color || null;
     authEl("teamHeading").textContent = currentTeam.teamName;
     updateTeamBadge();
     renderDescriptions();
+    renderTeamLook();
   });
 }
 
@@ -254,11 +259,81 @@ function renderRosterLists() {
   if (!athletes.children.length) athletes.appendChild(el("li", "log-note", "No athletes yet. Add some below."));
 }
 
-// Round initial, like the profile icon top right.
-function avatar(fullName, isMe) {
-  var a = el("span", "person-avatar" + (isMe ? " is-me" : ""), (fullName || "?").trim().charAt(0).toUpperCase());
+// Round picture, or the initial when there's none (like the profile icon top right).
+function avatar(fullName, isMe, avatarPath) {
+  var a = el("span", "person-avatar" + (isMe ? " is-me" : ""));
   a.setAttribute("aria-hidden", "true");
+  fillAvatar(a, fullName, avatarPath);
   return a;
+}
+function fillAvatar(a, fullName, avatarPath) {
+  a.innerHTML = "";
+  var url = profilePictureUrl(avatarPath);
+  a.classList.toggle("has-photo", !!url);
+  if (url) {
+    var img = document.createElement("img");
+    img.alt = "";
+    img.src = url;
+    a.appendChild(img);
+  } else {
+    a.textContent = (fullName || "?").trim().charAt(0).toUpperCase();
+  }
+}
+
+/* ---- pictures ----
+   Profile pictures: public bucket "pictures", viewed by link.
+   Team pictures: private bucket "team-pictures"; only team members can get a
+   (1-hour) link. See supabase/migrations/2026-10-14-team-identity.sql. */
+function profilePictureUrl(path) {
+  return path && sb ? sb.storage.from("pictures").getPublicUrl(path).data.publicUrl : null;
+}
+
+var teamPictureCache = {}; // path -> { at, promise }
+function teamPictureUrl(path) {
+  if (!path || !sb) return Promise.resolve(null);
+  var hit = teamPictureCache[path];
+  if (!hit || Date.now() - hit.at > 50 * 60000) { // links last an hour
+    hit = teamPictureCache[path] = {
+      at: Date.now(),
+      promise: sb.storage.from("team-pictures").createSignedUrl(path, 3600)
+        .then(function (res) { return res.error ? null : res.data.signedUrl; })
+    };
+  }
+  return hit.promise;
+}
+
+// A picture file -> a square JPEG of size x size (centre crop), so uploads
+// stay small and every picture fits a circle.
+function squareJpeg(file, size) {
+  return new Promise(function (resolve, reject) {
+    var img = new Image();
+    var src = URL.createObjectURL(file);
+    img.onload = function () {
+      var side = Math.min(img.naturalWidth, img.naturalHeight);
+      var canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      canvas.getContext("2d").drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, size, size);
+      URL.revokeObjectURL(src);
+      canvas.toBlob(function (blob) { blob ? resolve(blob) : reject(new Error("Couldn't read that picture.")); }, "image/jpeg", 0.85);
+    };
+    img.onerror = function () { URL.revokeObjectURL(src); reject(new Error("That file isn't a picture we can read.")); };
+    img.src = src;
+  });
+}
+
+// Shrink, upload under folder/<random>.jpg, then return the new path.
+function uploadPicture(bucket, folder, file, size) {
+  return squareJpeg(file, size).then(function (blob) {
+    var path = folder + "/" + (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + ".jpg";
+    return sb.storage.from(bucket).upload(path, blob, { contentType: "image/jpeg" }).then(function (res) {
+      if (res.error) throw res.error;
+      return path;
+    });
+  });
+}
+
+function removePicture(bucket, path) {
+  if (path) sb.storage.from(bucket).remove([path]); // best effort: an old file left behind does no harm
 }
 
 function personRow(m) {
@@ -270,7 +345,7 @@ function personRow(m) {
   if (isTeamStaff() || isMe) {
     var b = el("button", "person-open");
     b.type = "button";
-    b.appendChild(avatar(m.full_name, isMe));
+    b.appendChild(avatar(m.full_name, isMe, m.avatar_path));
     // Name and role on the first line; training status and readiness
     // flags below (only loaded for people you're allowed to see).
     var text = el("span", "person-text");
@@ -289,7 +364,7 @@ function personRow(m) {
     b.addEventListener("click", function () { showProgress(m); });
     li.appendChild(b);
   } else {
-    li.appendChild(avatar(m.full_name, isMe));
+    li.appendChild(avatar(m.full_name, isMe, m.avatar_path));
     li.appendChild(name);
     li.appendChild(meta);
   }
@@ -471,7 +546,7 @@ function renderActivityFeed(events) {
     var who = member ? member.full_name : "Someone";
     var isMe = currentUser && g.first.user_id === currentUser.id;
     var li = el("li", "person-row");
-    li.appendChild(avatar(who, isMe));
+    li.appendChild(avatar(who, isMe, member && member.avatar_path));
     var text = el("span", "person-text");
     var top = el("span", "person-line");
     top.appendChild(el("span", "person-name", who + (isMe ? " (you)" : "")));
@@ -495,6 +570,106 @@ function setGroupSummary(sets) {
   if (speeds.length) parts.push("best set avg " + Math.max.apply(null, speeds).toFixed(2) + " m/s");
   return parts.join(" \u00b7 ");
 }
+
+/* ---- team look: picture and colour ---- */
+// 8 colours, each tested readable (contrast at least 3:1) on the light and
+// dark page backgrounds.
+var TEAM_COLORS = [
+  { name: "Blue", hex: "#3D6BE8" }, { name: "Teal", hex: "#13897F" },
+  { name: "Green", hex: "#3C8D3F" }, { name: "Gold", hex: "#A87A0A" },
+  { name: "Orange", hex: "#D0621F" }, { name: "Red", hex: "#D93B45" },
+  { name: "Pink", hex: "#C9468F" }, { name: "Purple", hex: "#8E5BD9" }
+];
+
+function renderTeamLook() {
+  var view = teamViewEl;
+  var logo = authEl("teamLogo");
+  var color = currentTeam && currentTeam.color;
+  view.style.setProperty("--team", color || "var(--accent)");
+  view.classList.toggle("has-team-color", !!color);
+  logo.hidden = !currentTeam;
+  authEl("teamLookToggle").hidden = !currentTeam || !isTeamStaff();
+  if (!currentTeam) { authEl("teamLookPanel").hidden = true; return; }
+
+  logo.innerHTML = "";
+  logo.textContent = currentTeam.teamName.trim().charAt(0).toUpperCase();
+  logo.classList.remove("has-photo");
+  var forPath = currentTeam.logo_path;
+  teamPictureUrl(forPath).then(function (url) {
+    if (!url || !currentTeam || currentTeam.logo_path !== forPath) return;
+    logo.textContent = "";
+    var img = document.createElement("img");
+    img.alt = "";
+    img.src = url;
+    logo.appendChild(img);
+    logo.classList.add("has-photo");
+  });
+  authEl("teamPhotoRemove").hidden = !currentTeam.logo_path;
+
+  var swatches = authEl("teamColorSwatches");
+  swatches.innerHTML = "";
+  [{ name: "Default", hex: null }].concat(TEAM_COLORS).forEach(function (c) {
+    var b = el("button", "color-swatch" + (c.hex ? "" : " is-default"));
+    b.type = "button";
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String((currentTeam.color || null) === c.hex));
+    b.setAttribute("aria-label", c.name);
+    b.title = c.name;
+    if (c.hex) b.style.background = c.hex;
+    b.addEventListener("click", function () { saveTeamColor(c.hex); });
+    swatches.appendChild(b);
+  });
+}
+
+function saveTeamColor(hex) {
+  authEl("teamLookStatus").textContent = "Saving\u2026";
+  sb.from("teams").update({ color: hex }).eq("id", currentTeam.team_id).select("color").single().then(function (res) {
+    if (res.error) { authEl("teamLookStatus").textContent = "Couldn't save: " + res.error.message; return; }
+    currentTeam.color = res.data.color || null;
+    authEl("teamLookStatus").textContent = "Saved.";
+    renderTeamLook();
+    updateTeamBadge();
+  });
+}
+
+authEl("teamLookToggle").addEventListener("click", function () {
+  authEl("teamLookPanel").hidden = false;
+  authEl("teamLookToggle").hidden = true;
+  authEl("teamLookStatus").textContent = "";
+});
+authEl("teamLookDone").addEventListener("click", function () {
+  authEl("teamLookPanel").hidden = true;
+  authEl("teamLookToggle").hidden = false;
+});
+authEl("teamPhotoBtn").addEventListener("click", function () { authEl("teamPhotoInput").click(); });
+authEl("teamPhotoInput").addEventListener("change", function () {
+  var file = this.files[0];
+  this.value = "";
+  if (!file || !currentTeam) return;
+  var team = currentTeam, old = team.logo_path;
+  authEl("teamLookStatus").textContent = "Uploading\u2026";
+  uploadPicture("team-pictures", team.team_id, file, 512).then(function (path) {
+    return sb.from("teams").update({ logo_path: path }).eq("id", team.team_id).select("logo_path").single().then(function (res) {
+      if (res.error) { removePicture("team-pictures", path); throw res.error; }
+      team.logo_path = res.data.logo_path;
+      removePicture("team-pictures", old);
+      authEl("teamLookStatus").textContent = "Saved.";
+      renderTeamLook();
+      updateTeamBadge();
+    });
+  }).catch(function (err) { authEl("teamLookStatus").textContent = "Couldn't upload: " + err.message; });
+});
+authEl("teamPhotoRemove").addEventListener("click", function () {
+  var team = currentTeam, old = team.logo_path;
+  sb.from("teams").update({ logo_path: null }).eq("id", team.team_id).then(function (res) {
+    if (res.error) { authEl("teamLookStatus").textContent = "Couldn't remove: " + res.error.message; return; }
+    team.logo_path = null;
+    removePicture("team-pictures", old);
+    authEl("teamLookStatus").textContent = "Removed.";
+    renderTeamLook();
+    updateTeamBadge();
+  });
+});
 
 /* ---- Today's session ----
    Planned workouts are stored one per day (workouts.scheduled_date). The
@@ -614,7 +789,7 @@ function renderTodayCoach(workouts, logsToday) {
     var li = el("li", "person-row");
     var b = el("button", "person-open");
     b.type = "button";
-    b.appendChild(avatar(member.full_name, isMe));
+    b.appendChild(avatar(member.full_name, isMe, member.avatar_path));
     var text = el("span", "person-text");
     var top = el("span", "person-line");
     top.appendChild(el("span", "person-name", member.full_name + (isMe ? " (you)" : "")));
@@ -736,7 +911,7 @@ function loadTopPrs() {
           var li = el("li", "pr-row");
           var isMe = currentUser && r.user_id === currentUser.id;
           li.appendChild(el("span", "pr-rank", String(r.rank)));
-          li.appendChild(avatar(r.full_name, isMe));
+          li.appendChild(avatar(r.full_name, isMe, r.avatar_path));
           var who = el("span", "pr-who");
           who.appendChild(el("span", "person-name", r.full_name + (isMe ? " (you)" : "")));
           var when = new Date(r.recorded_at);
@@ -1049,7 +1224,7 @@ function refreshJoinRequestCount() {
 
 function loadJoinRequests() {
   sb.from("team_join_requests")
-    .select("id, created_at, invite_id, requester:profiles!team_join_requests_user_id_fkey(full_name)")
+    .select("id, created_at, invite_id, requester:profiles!team_join_requests_user_id_fkey(full_name, avatar_path)")
     .eq("team_id", currentTeam.team_id)
     .eq("status", "pending")
     .order("created_at")
@@ -1061,7 +1236,7 @@ function loadJoinRequests() {
       res.data.forEach(function (r) {
         var li = el("li", "person-row");
         var who = r.requester ? r.requester.full_name : "Someone";
-        li.appendChild(avatar(who, false));
+        li.appendChild(avatar(who, false, r.requester && r.requester.avatar_path));
         li.appendChild(el("span", "person-name", who));
         li.appendChild(el("span", "person-meta", r.invite_id ? "suggested by a teammate" : "found the team in search"));
         var actions = el("span", "person-actions");
@@ -1298,9 +1473,17 @@ function updateProfileButton() {
   var initial = authEl("profileInitial");
   var svg = authEl("profileBtn").querySelector("svg");
   var name = currentProfile && currentProfile.full_name;
+  var photo = currentUser && currentProfile ? profilePictureUrl(currentProfile.avatar_path) : null;
   initial.textContent = name ? name.trim().charAt(0).toUpperCase() : "";
-  initial.hidden = !name;
-  svg.style.display = name ? "none" : "";
+  initial.hidden = !name || !!photo;
+  svg.style.display = name || photo ? "none" : "";
+  [["profilePhoto", "profileBtn"], ["navProfilePhoto", "navProfileBtn"]].forEach(function (ids) {
+    var img = authEl(ids[0]);
+    img.hidden = !photo;
+    if (photo) img.src = photo; else img.removeAttribute("src");
+    authEl(ids[1]).classList.toggle("has-photo", !!photo);
+  });
+  authEl("navProfileInitial").hidden = !!photo;
   authEl("profileBtn").classList.toggle("is-logged-in", !!currentUser);
   // Landing-page nav: show the profile circle instead of "Log in" once logged in.
   authEl("navLoginBtn").hidden = !!currentUser;
@@ -1314,11 +1497,58 @@ authEl("profileBtn").addEventListener("click", function () {
   authEl("accountEmail").textContent = currentUser.email;
   authEl("accountName").value = currentProfile ? currentProfile.full_name : "";
   authEl("accountStatus").textContent = "";
+  renderAccountPhoto();
+  authEl("accountPhotoStatus").textContent = "Shown to your team instead of your initial.";
   accountOverlayEl.hidden = false;
   authEl("accountName").focus();
 });
 
 function closeAccountModal() { accountOverlayEl.hidden = true; }
+
+/* ---- your profile picture (account settings) ---- */
+function renderAccountPhoto() {
+  var path = currentProfile && currentProfile.avatar_path;
+  fillAvatar(authEl("accountAvatar"), currentProfile ? currentProfile.full_name : "", path);
+  authEl("accountAvatar").classList.add("is-me");
+  authEl("accountPhotoRemove").hidden = !path;
+  authEl("accountPhotoBtn").textContent = path ? "Change picture" : "Upload picture";
+}
+
+// After your picture changes: header icons, account settings, and the team page.
+function afterPhotoChange() {
+  renderAccountPhoto();
+  updateProfileButton();
+  lastRoster.forEach(function (m) { if (currentUser && m.user_id === currentUser.id) m.avatar_path = currentProfile.avatar_path; });
+  if (!teamViewEl.hidden && currentTeam) { renderRosterLists(); loadTopPrs(); }
+}
+
+authEl("accountPhotoBtn").addEventListener("click", function () { authEl("accountPhotoInput").click(); });
+authEl("accountPhotoInput").addEventListener("change", function () {
+  var file = this.files[0];
+  this.value = "";
+  if (!file || !currentUser) return;
+  var userId = currentUser.id, old = currentProfile && currentProfile.avatar_path;
+  authEl("accountPhotoStatus").textContent = "Uploading\u2026";
+  uploadPicture("pictures", "profiles/" + userId, file, 256).then(function (path) {
+    return sb.from("profiles").update({ avatar_path: path }).eq("id", userId).select("avatar_path").single().then(function (res) {
+      if (res.error) { removePicture("pictures", path); throw res.error; }
+      currentProfile = Object.assign({}, currentProfile, { avatar_path: res.data.avatar_path });
+      removePicture("pictures", old);
+      authEl("accountPhotoStatus").textContent = "Saved.";
+      afterPhotoChange();
+    });
+  }).catch(function (err) { authEl("accountPhotoStatus").textContent = "Couldn't upload: " + err.message; });
+});
+authEl("accountPhotoRemove").addEventListener("click", function () {
+  var old = currentProfile && currentProfile.avatar_path;
+  sb.from("profiles").update({ avatar_path: null }).eq("id", currentUser.id).then(function (res) {
+    if (res.error) { authEl("accountPhotoStatus").textContent = "Couldn't remove: " + res.error.message; return; }
+    currentProfile = Object.assign({}, currentProfile, { avatar_path: null });
+    removePicture("pictures", old);
+    authEl("accountPhotoStatus").textContent = "Removed.";
+    afterPhotoChange();
+  });
+});
 authEl("accountModalClose").addEventListener("click", closeAccountModal);
 var accountPressedOnBackdrop = false;
 accountOverlayEl.addEventListener("mousedown", function (e) { accountPressedOnBackdrop = e.target === accountOverlayEl; });
@@ -1336,7 +1566,7 @@ authEl("accountForm").addEventListener("submit", function (e) {
   sb.from("profiles").update({ full_name: name }).eq("id", currentUser.id).select("full_name").single().then(function (res) {
     authEl("accountSave").disabled = false;
     if (res.error) { authEl("accountStatus").textContent = "Couldn't save: " + res.error.message; return; }
-    currentProfile = res.data;
+    currentProfile = Object.assign({}, currentProfile, res.data);
     updateProfileButton();
     authEl("accountStatus").textContent = "Saved.";
     if (!teamViewEl.hidden) renderTeamPage();

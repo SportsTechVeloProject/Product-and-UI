@@ -126,6 +126,20 @@ function updateTeamBadge() {
   var badge = authEl("teamBadge");
   if (!badge) return;
   badge.textContent = currentTeam ? currentTeam.teamName : "No team assigned";
+  // Team colour and picture (team.js) on the badge.
+  badge.style.color = currentTeam && currentTeam.color ? currentTeam.color : "";
+  badge.style.borderColor = currentTeam && currentTeam.color ? currentTeam.color : "";
+  if (currentTeam && currentTeam.logo_path && typeof teamPictureUrl === "function") {
+    var forPath = currentTeam.logo_path;
+    teamPictureUrl(forPath).then(function (url) {
+      if (!url || !currentTeam || currentTeam.logo_path !== forPath || badge.querySelector(".badge-logo")) return;
+      var img = document.createElement("img");
+      img.className = "badge-logo";
+      img.alt = "";
+      img.src = url;
+      badge.insertBefore(img, badge.firstChild);
+    });
+  }
   if (currentTeam && pendingJoinCount) {
     var count = document.createElement("span");
     count.className = "count-badge";
@@ -141,7 +155,7 @@ function updateTeamBadge() {
 // token ("JWT issued at future") because Supabase's servers' clocks differ by a
 // second or two. Retry a few times instead of wrongly showing "No team assigned".
 function fetchMembership(user, attempt) {
-  return sb.from("team_members").select("team_id, role, teams(name, public_description, private_description)")
+  return sb.from("team_members").select("team_id, role, teams(name, public_description, private_description, logo_path, color)")
     .eq("user_id", user.id).limit(1).maybeSingle()
     .then(function (res) {
       if (res.error && attempt < 4) {
@@ -157,7 +171,7 @@ function loadMembership(user) {
   // Profile second: by then the login token is accepted (see fetchMembership).
   return fetchMembership(user, 1)
     .then(function (teamRes) {
-      return sb.from("profiles").select("full_name").eq("id", user.id).maybeSingle().then(function (res) {
+      return sb.from("profiles").select("full_name, avatar_path").eq("id", user.id).maybeSingle().then(function (res) {
         currentProfile = res.data || null;
         return teamRes;
       });
@@ -174,7 +188,9 @@ function loadMembership(user) {
           role: res.data.role,
           teamName: res.data.teams.name,
           public_description: res.data.teams.public_description || "",
-          private_description: res.data.teams.private_description || ""
+          private_description: res.data.teams.private_description || "",
+          logo_path: res.data.teams.logo_path || null,
+          color: res.data.teams.color || null
         };
       } else {
         currentTeam = null;

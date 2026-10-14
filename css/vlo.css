@@ -694,6 +694,46 @@
     font-size: 0.85rem;
   }
   .person-avatar.is-me { background: var(--accent); color: var(--accent-contrast); }
+  .person-avatar.has-photo, .profile-btn.has-photo { overflow: hidden; padding: 0; background: var(--surface); }
+  .person-avatar img, .profile-photo { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 50%; }
+  .profile-photo[hidden] { display: none; }
+  .person-avatar.avatar-lg { width: 64px; height: 64px; font-size: 1.5rem; }
+  .account-photo { display: flex; align-items: center; gap: 16px; margin-top: 18px; }
+  .account-photo .log-row { gap: 8px; }
+  .account-photo .log-note { margin-top: 6px; }
+  #accountPhotoRemove[hidden], #teamPhotoRemove[hidden] { display: none; }
+
+  /* ---- team look: picture + colour ---- */
+  .team-title-row { display: flex; align-items: center; gap: 16px; }
+  .team-title-row .eyebrow { margin: 0; }
+  .team-logo {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--team, var(--accent));
+    color: #fff;
+    font-family: 'Big Shoulders Display', sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+  }
+  .team-logo[hidden] { display: none; }
+  .team-logo.has-photo { background: var(--surface); }
+  .team-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #teamView.has-team-color #teamHeading, #teamView.has-team-color #teamEyebrow { color: var(--team); }
+  .team-look-toggle { margin-top: 10px; }
+  .team-look-toggle[hidden], .team-look[hidden] { display: none; }
+  .team-look { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 4px; background: var(--surface); max-width: 520px; }
+  .color-swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 15%, transparent); }
+  .color-swatch.is-default { background: linear-gradient(135deg, var(--accent) 50%, var(--surface) 50%); }
+  .color-swatch[aria-checked="true"] { outline: 2px solid var(--fg); outline-offset: 2px; }
+  .color-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .badge-logo { width: 16px; height: 16px; border-radius: 50%; object-fit: cover; margin-right: 6px; vertical-align: -3px; }
   /* Small red number, e.g. pending join requests. */
   .count-badge {
     display: inline-flex;
