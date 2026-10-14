@@ -105,16 +105,22 @@
   }
 
   /* ---- nav ---- */
+  /* Sticky like the app header, so the profile circle stays locked top-right. */
   nav.top {
     border-bottom: 1px solid var(--rule);
     background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 5;
   }
   nav.top .wrap {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding-block: 18px;
+    /* Same height as .app-top-row so the profile circle doesn't jump between views. */
+    min-height: 76px;
+    padding-block: 0;
     flex-wrap: wrap;
   }
   .logo {
@@ -135,6 +141,14 @@
     flex-wrap: wrap;
   }
   .navlinks a { text-decoration: none; color: var(--muted); }
+  .nav-right { display: flex; align-items: center; gap: 10px; margin-left: auto; flex: none; min-height: 76px; }
+  @media (max-width: 760px) {
+    /* Keep logo + right-hand buttons on the first row; links drop below. */
+    nav.top .navlinks { order: 3; width: 100%; padding-bottom: 14px; }
+  }
+  @media (max-width: 480px) {
+    nav.top .nav-right > a.btn { display: none; }
+  }
   .navlinks a:hover { color: var(--fg); }
   .btn {
     display: inline-flex;
@@ -368,7 +382,8 @@
     display: flex;
     align-items: center;
     gap: 20px;
-    padding-block: 16px;
+    min-height: 76px;
+    padding-block: 0;
   }
   .app-top-row > .logo { flex: none; }
   /* Everything between the logo and the right-hand buttons shares the leftover
@@ -465,7 +480,7 @@
   .profile-btn:hover { color: var(--fg); border-color: var(--muted); }
   .profile-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .profile-btn.is-logged-in { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
-  .profile-initial[hidden] { display: none; }
+  .profile-btn[hidden], .profile-initial[hidden] { display: none; }
   .profile-dot {
     position: absolute;
     top: -2px;

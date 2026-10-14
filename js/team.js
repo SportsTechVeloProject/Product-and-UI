@@ -691,6 +691,11 @@ function updateProfileButton() {
   initial.hidden = !name;
   svg.style.display = name ? "none" : "";
   authEl("profileBtn").classList.toggle("is-logged-in", !!currentUser);
+  // Landing-page nav: show the profile circle instead of "Log in" once logged in.
+  authEl("navLoginBtn").hidden = !!currentUser;
+  authEl("navProfileBtn").hidden = !currentUser;
+  authEl("navProfileInitial").textContent = name ? name.trim().charAt(0).toUpperCase()
+    : (currentUser ? currentUser.email.charAt(0).toUpperCase() : "");
 }
 
 authEl("profileBtn").addEventListener("click", function () {
