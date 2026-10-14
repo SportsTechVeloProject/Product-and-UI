@@ -137,11 +137,23 @@ function parseExerciseLine(raw) {
   });
 
   // 3b. training zone the coach wants the sets in — velocity-based planning:
-  // "Back squat 5x3 strength-speed", "zone: accelerative strength".
-  take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
-    var z = fold(m[1]);
-    item.zone = /^speed/.test(z) ? "Speed–strength" : /^strength/.test(z) ? "Strength–speed"
-      : /^accel/.test(z) ? "Accelerative strength" : "Maximal strength";
+  // "Back squat 5x3 traditional", "zone: explosivity", "@maximal strength".
+  // Single words (explosive, traditional, and the short fast/medium/slow)
+  // only count when marked with "zone:"/"@", followed by "zone", or last on
+  // the line, so "Traditional deadlift" or "3x5 slow eccentric" aren't read
+  // as zones. The old four zone names from earlier plans still read: the two
+  // faster ones are Traditional now, the two heavy ones Maximal Strength.
+  function zoneName(word) {
+    var z = fold(word);
+    return /^(fast|explosiv)/.test(z) ? "Explosivity"
+      : /^(slow|accel|max)/.test(z) ? "Maximal Strength" : "Traditional";
+  }
+  var ZONE_WORD = "(explosiv(?:e|ity)|traditional|fast|medium|slow)";
+  var gotZone = take(new RegExp("(?:^|\\s)(?:zone\\s*:?\\s*|@\\s*)" + ZONE_WORD + "(?=[\\s,;]|$)|(?:^|\\s)" + ZONE_WORD + "(?:\\s+zone\\b|(?=\\s*[,;]?\\s*$))", "i"), function (m) {
+    item.zone = zoneName(m[1] || m[2]);
+  });
+  if (!gotZone) take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
+    item.zone = zoneName(m[1]);
   });
 
   // 4. load — percentage and RPE before any bare "@140", which is kilos
@@ -1183,11 +1195,10 @@ function helpSheet() {
     [],
     [H("What bar speed means")],
     [K("Bar speed"), K("Zone"), K("What it trains")],
-    [L("above 0.75 m/s"), W("Speed–strength"), W("Rate of force development. Carries over to explosiveness.")],
-    [L("0.50 – 0.75 m/s"), W("Strength–speed"), W("The bridge. Most of a training block's volume lives here.")],
-    [L("0.30 – 0.50 m/s"), W("Accelerative strength"), W("Competition-lift strength work, doubles and triples.")],
-    [L("below 0.30 m/s"), W("Maximal strength"), W("Peaking and near-maximal singles. Used sparingly.")],
-    [M("The deadlift runs its own curve, because bar speed at a maximal pull is lower than in the squat or bench.")],
+    [L("above 1.30 m/s"), W("Explosivity"), W("Explosive speed work at light loads. Carries over to explosiveness.")],
+    [L("0.50 – 1.30 m/s"), W("Traditional"), W("Most of a training block's volume lives here.")],
+    [L("below 0.50 m/s"), W("Maximal Strength"), W("Heavy triples, doubles and near-maximal singles. Peaking work.")],
+    [M("Write the zone after the exercise, e.g. Back squat 5x3 traditional. The same limits apply to every lift.")],
     [],
     [H("You don't have to use this layout")],
     [W("V-Lo also reads weeks across the top with exercises down the side, one sheet per week, a Word table, a CSV, or a plain text list. Anything it can't read is listed back to you rather than dropped silently.")]
@@ -1402,13 +1413,13 @@ function renderPlanItem(item) {
 
 // What a block of each type should mostly consist of, by velocity zone.
 var BLOCK_EXPECTATION = {
-  hypertrophy: ["Strength–speed", "Accelerative strength"],
-  strength: ["Accelerative strength", "Maximal strength"],
-  peaking: ["Maximal strength", "Accelerative strength"],
-  power: ["Speed–strength", "Strength–speed"],
-  speed: ["Speed–strength", "Strength–speed"],
-  "off season": ["Strength–speed", "Accelerative strength"],
-  "in season": ["Speed–strength", "Strength–speed"]
+  hypertrophy: ["Traditional"],
+  strength: ["Maximal Strength", "Traditional"],
+  peaking: ["Maximal Strength"],
+  power: ["Explosivity", "Traditional"],
+  speed: ["Explosivity", "Traditional"],
+  "off season": ["Traditional"],
+  "in season": ["Explosivity", "Traditional"]
 };
 
 var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",

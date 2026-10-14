@@ -3,6 +3,14 @@
 "use strict";
 
 /* ---------------- data model ---------------- */
+// Speed zones, fastest first, by a set's mean bar speed. The same limits for
+// every lift for now; give a lift its own list in EXERCISES if that changes.
+var SPEED_ZONES = [
+  { min: 1.30, label: "Explosivity" },
+  { min: 0.50, label: "Traditional" },
+  { min: 0,    label: "Maximal Strength" }
+];
+
 // Fictional lifter, fictional load-velocity profile per lift.
 // V(%1RM) = a - b * (%1RM/100), calibrated so V(100%) = v1RM (approx. published VBT anchors).
 var EXERCISES = {
@@ -14,12 +22,7 @@ var EXERCISES = {
     cycleLabels: ["Top", "Bottom (depth)", "Top"],
     driftCenters: [50],             // forward drift risk is at depth
     driftCaption: "Positive = the bar drifts forward, toward your toes; negative = back toward your heels.",
-    zones: [
-      { min: 0.75, label: "Speed–strength" },
-      { min: 0.50, label: "Strength–speed" },
-      { min: 0.30, label: "Accelerative strength" },
-      { min: 0,    label: "Maximal strength" }
-    ],
+    zones: SPEED_ZONES,
     history: [
       { date: "Aug 9",  time: "6:10 PM", weight: 100 },
       { date: "Aug 16", time: "6:05 PM", weight: 105 },
@@ -37,12 +40,7 @@ var EXERCISES = {
     cycleLabels: ["Top (lockout)", "Bottom (chest)", "Top (lockout)"],
     driftCenters: [50],             // drift risk is off the chest
     driftCaption: "Positive = the bar drifts toward the rack, over your face; negative = back toward your hips.",
-    zones: [
-      { min: 0.75, label: "Speed–strength" },
-      { min: 0.50, label: "Strength–speed" },
-      { min: 0.30, label: "Accelerative strength" },
-      { min: 0,    label: "Maximal strength" }
-    ],
+    zones: SPEED_ZONES,
     history: [
       { date: "Aug 9",  time: "5:40 PM", weight: 75 },
       { date: "Aug 16", time: "5:35 PM", weight: 77.5 },
@@ -60,12 +58,7 @@ var EXERCISES = {
     cycleLabels: ["Bottom (floor)", "Top (lockout)", "Bottom (floor)"],
     driftCenters: [15, 85],         // drift risk is breaking the floor and re-setting
     driftCaption: "Positive = the bar drifts away from your shins, out in front; negative = back into your shins.",
-    zones: [
-      { min: 0.50, label: "Speed–strength" },
-      { min: 0.30, label: "Strength–speed" },
-      { min: 0.15, label: "Accelerative strength" },
-      { min: 0,    label: "Maximal strength" }
-    ],
+    zones: SPEED_ZONES,
     history: [
       { date: "Aug 9",  time: "7:05 PM", weight: 130 },
       { date: "Aug 16", time: "7:00 PM", weight: 135 },
@@ -78,21 +71,17 @@ var EXERCISES = {
 };
 
 var ZONE_INFO = {
-  "Speed–strength": {
-    desc: "Light-to-moderate loads, roughly 30–60% of 1RM, moved with maximum intended acceleration.",
-    benefit: "Trains the nervous system to produce force fast — improves rate of force development and bar acceleration off the bottom. It carries over to explosiveness, but does little on its own to raise your 1RM."
+  "Explosivity": {
+    desc: "Light loads, roughly under 40% of 1RM, moved as fast as possible: speed work, jumps and explosive reps.",
+    benefit: "Trains the nervous system to produce force quickly. Builds explosiveness and bar acceleration, but does little on its own to raise your 1RM."
   },
-  "Strength–speed": {
-    desc: "Moderate loads, roughly 60–80% of 1RM — heavier than speed-strength work, still lifted with intent to move fast even though the bar itself moves slower.",
-    benefit: "The bridge between raw strength and speed: builds the ability to move genuinely heavy weight quickly. Typical territory for hypertrophy-strength blocks and the bulk of a training cycle's volume."
+  "Traditional": {
+    desc: "Light-to-moderately heavy loads, roughly 40–80% of 1RM, still lifted with intent to move fast.",
+    benefit: "Where most of a training block's volume lives. Builds strength and muscle and the ability to move heavy weight quickly."
   },
-  "Accelerative strength": {
-    desc: "Heavy loads, roughly 80–90% of 1RM, usually doubles and triples — bar speed drops, but the intent to accelerate stays.",
-    benefit: "The main zone for competition-lift strength work. Builds maximal strength and grooves technical consistency under a load close to what you'll actually face on the platform."
-  },
-  "Maximal strength": {
-    desc: "Near-1RM loads, 90%+, typically singles — competition-style attempts.",
-    benefit: "Trains maximum motor-unit recruitment and the ability to produce force at very slow bar speeds. Essential for peaking toward a meet, but taxing on the nervous system — used sparingly, not as everyday volume."
+  "Maximal Strength": {
+    desc: "Heavy loads, roughly 80% of 1RM and up: triples, doubles and near-maximal singles. The bar slows down, but the intent to accelerate stays.",
+    benefit: "Builds maximal strength and grooves technique under competition-like loads. Essential for peaking, but taxing on the nervous system, so use it with care."
   }
 };
 
@@ -106,7 +95,7 @@ function zoneRangeLabel(ex, idx) {
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Colour token for a speed's zone: --zone-1 (fastest zone) to --zone-4.
+// Colour token for a speed's zone: --zone-1 (fastest zone) to --zone-3.
 function zoneColor(ex, v) {
   for (var i = 0; i < ex.zones.length; i++) {
     if (v >= ex.zones[i].min) return "var(--zone-" + (i + 1) + ")";
