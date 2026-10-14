@@ -137,14 +137,19 @@ def analyze(samples, reps=None, zone=None, plot=False):
         side, magnitude, t_sec, raw = "right", magnitude_right_filtered, t_right_sec, magnitude_right_raw
 
     try:
-        with quiet(plot):
+        with quiet(plot, reps):
             results = VelocityCalculations.calculate_velocity3(
                 magnitude, t_sec, speed_type, reps=reps, magnitude_raw=raw, window_size=WINDOW_SIZE)
     except IndexError as err:
         # Their drift step looks for the bar being racked (a big spike) after
         # the first 5 s to find where the set ends; without it, this fails.
-        raise ValueError("Couldn't find the end of the set. Start recording standing still for a few seconds, "
-                         "and press Stop only after the bar is back in the rack. (%s)" % err) from None
+        spike, needed = end_spike(raw, speed_type)
+        if plot:
+            plot_end_spike(t_sec, raw, needed, side, speed_type)
+        raise ValueError("Couldn't find the end of the set: the biggest spike after 5 s on the %s sensor was "
+                         "%.1f m/s², the '%s' analysis needs one above %.1f (the bar being racked). Start recording "
+                         "standing still for a few seconds, and press Stop only after the bar is back in the rack."
+                         % (side, spike, speed_type, needed)) from err
 
     # ============================================================
     # One row per rep (was: results.json)
@@ -165,28 +170,62 @@ def analyze(samples, reps=None, zone=None, plot=False):
     return {"reps": rows, "warnings": warnings, "version": VERSION}
 
 
+DRIFT_START = 520  # VelocityCalculations.find_drift looks for the spike from here (5 s)
+
+
+def end_spike(raw, speed_type):
+    """The biggest acceleration after 5 s, and the height find_drift needs
+    (its threshold: a multiple of the average acceleration, per type)."""
+    needed = VelocityCalculations.threshold_dict[speed_type][0] * float(np.mean(raw))
+    after = raw[DRIFT_START:]
+    return (float(np.max(after)) if len(after) else 0.0), needed
+
+
+def plot_end_spike(t_sec, raw, needed, side, speed_type):
+    """With --plot: why the end of the set wasn't found."""
+    plt.figure(figsize=(12, 5))
+    plt.plot(t_sec, raw, label="raw acceleration magnitude (%s sensor)" % side)
+    plt.axhline(needed, color="red", linestyle="--", label="find_drift threshold ('%s')" % speed_type)
+    plt.axvline(t_sec[min(DRIFT_START, len(t_sec) - 1)], color="grey", linestyle=":", label="5 s: search starts here")
+    plt.xlabel("Time [s]")
+    plt.ylabel("Acceleration [m/s²]")
+    plt.title("No spike above the threshold after 5 s: the set's end (bar racked) wasn't found")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
 @contextlib.contextmanager
-def quiet(plot):
-    """Their velocity step always plots and prints debug output. Without
-    plot=True: no plot windows (and none on Azure), prints swallowed, and a
-    stop if the rep search can't find enough reps (it would loop forever)."""
-    if plot:
-        yield
-        return
+def quiet(plot, reps):
+    """Their velocity step always plots and prints debug output: without
+    plot=True no plot windows (none on Azure) and prints swallowed. Always: a
+    stop when the rep search can't find enough reps (their loop lowers the
+    threshold forever), with what it did find."""
     real_show, real_find_peaks = plt.show, VelocityCalculations.find_peaks
 
     def guarded_find_peaks(x, *args, **kwargs):
         height = kwargs.get("height")
         if isinstance(height, (int, float)) and height < -10:
-            raise ValueError("Couldn't find the reported number of reps in the recording.")
+            found = len(real_find_peaks(x, distance=kwargs.get("distance"))[0])
+            gap = (kwargs.get("distance") or 1) / SAMPLE_RATE
+            raise ValueError(
+                "Couldn't find the reported %d reps: at most %d in the part of the recording the analysis "
+                "searches (%.1f s: from 5 s after Record until 2 s before the bar is racked), counting rep "
+                "peaks at least %.0f s apart. Do the reps after the first 5 s, wait 2 s before racking, and "
+                "check the rep count." % (reps, found, len(x) / SAMPLE_RATE, gap))
         return real_find_peaks(x, *args, **kwargs)
 
-    plt.show = lambda *a, **k: None
     VelocityCalculations.find_peaks = guarded_find_peaks
+    if not plot:
+        plt.show = lambda *a, **k: None
     try:
-        with contextlib.redirect_stdout(io.StringIO()):
+        if plot:
             yield
+        else:
+            with contextlib.redirect_stdout(io.StringIO()):
+                yield
     finally:
         plt.show = real_show
         VelocityCalculations.find_peaks = real_find_peaks
-        plt.close("all")
+        if not plot:
+            plt.close("all")

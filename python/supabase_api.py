@@ -30,8 +30,21 @@ def use_service_key(key):
     _api_key = key
 
 
+TIMEOUT_S = 60  # no call should hang forever (on Azure it would block the function)
+
+
 class SupabaseError(Exception):
-    pass
+    def __init__(self, message, status=None):
+        super().__init__(message)
+        self.status = status  # HTTP status code
+
+
+def is_transient(err):
+    """True for errors worth trying again later: the network, or Supabase
+    being busy or down (5xx, 429). False for real problems, like a missing file."""
+    if isinstance(err, SupabaseError):
+        return err.status is None or err.status >= 500 or err.status == 429
+    return isinstance(err, OSError)
 
 
 def _request(method, path, token=None, json_body=None, raw_body=None, headers=None):
@@ -45,12 +58,12 @@ def _request(method, path, token=None, json_body=None, raw_body=None, headers=No
         data = json.dumps(json_body).encode()
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, data) as res:
+        with urllib.request.urlopen(req, data, timeout=TIMEOUT_S) as res:
             text = res.read().decode()
             return json.loads(text) if text else None
     except urllib.error.HTTPError as err:
         raise SupabaseError("%s %s failed (%s): %s" % (
-            method, path.split("?")[0], err.code, err.read().decode()[:400])) from None
+            method, path.split("?")[0], err.code, err.read().decode()[:400]), err.code) from None
 
 
 def log_in(email, password):

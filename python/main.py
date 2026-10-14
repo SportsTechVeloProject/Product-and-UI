@@ -15,6 +15,7 @@ below) and look at the data between steps.
 Usage (needs numpy, scipy, pandas, matplotlib, imufusion):
   python main.py recording.csv --weight 100 --reps 11      # the whole chain
   python main.py recording.csv --dry-run                   # steps 1 and 3 only, nothing stored
+  python main.py recording.csv --reps 6 --store-only       # step 2 only: upload like the website; Azure analyzes it
   python main.py --session <id>                            # steps 3-5 for an existing session
   python main.py --session <id> --replace                  # same, replacing its reps
   add --plot to any of them to see the data team's plots
@@ -39,10 +40,12 @@ import csv
 import datetime
 import getpass
 import json
+import logging
 import math
 import os
 import sys
 import time
+import traceback
 import urllib.parse
 import uuid
 
@@ -296,13 +299,32 @@ def process_waiting(session, raise_transient=False):
 
 
 def fail(sid, label, err):
-    """Saves why a recording couldn't be analyzed; the website shows it."""
-    reason = (str(err) or err.__class__.__name__).strip()[:500]
+    """Saves why a recording couldn't be analyzed; the website shows it.
+    Adds where in the code it failed; the full traceback goes to the log
+    (Azure: Log stream / Application Insights)."""
+    reason = (str(err) or err.__class__.__name__).strip()
+    where = failed_at(err)
+    if where:
+        reason += " [at " + where + "]"
     try:
-        mark_analyzed(None, sid, error=reason)
+        mark_analyzed(None, sid, error=reason[:1000])
     except (db.SupabaseError, OSError):
         pass
     print("FAILED  %s: %s" % (label, reason))
+    logging.error("FAILED %s", label, exc_info=(type(err), err, err.__traceback__))
+
+
+def failed_at(err):
+    """'VelocityCalculations.py:34 find_drift': where the error started (the
+    original error if it was re-raised with a clearer message)."""
+    cause = err.__cause__ or err
+    frames = traceback.extract_tb(cause.__traceback__) if cause.__traceback__ else []
+    if not frames:
+        return ""
+    # Prefer the deepest frame in the data team's files (python/squat/).
+    theirs = [f for f in frames if os.path.basename(os.path.dirname(f.filename)) == "squat"]
+    f = (theirs or frames)[-1]
+    return "%s:%d %s" % (os.path.basename(f.filename), f.lineno, f.name)
 
 
 def retry_new_analyses():
@@ -344,6 +366,8 @@ def main():
     parser.add_argument("--session", help="process an existing session instead of storing a new one")
     parser.add_argument("--replace", action="store_true", help="replace reps that already exist")
     parser.add_argument("--dry-run", action="store_true", help="load and process only; nothing stored")
+    parser.add_argument("--store-only", action="store_true",
+                        help="upload the recording like the website does and stop; the processing on Azure analyzes it")
     parser.add_argument("--plot", action="store_true", help="show the data team's plots")
     parser.add_argument("--zone", help="target zone for a local file, e.g. \"Strength–speed\" (default: none)")
     parser.add_argument("--watch", action="store_true", help="keep processing new recordings from the website")
@@ -368,6 +392,10 @@ def main():
         if not session_id:
             samples = load_recording(args.recording)
             session_id = store_session(token, user_id, samples, args.exercise, args.weight, args.reps, args.zone)
+            if args.store_only:
+                print("\nStored only: Azure analyzes it now (Supabase webhook). Watch it with:\n"
+                      "  select analyzed_at, analysis_error from sessions where id = '%s';" % session_id)
+                return
         results = process_session(token, session_id, args.plot)
         save_reps(token, session_id, results, args.replace)
         mark_analyzed(token, session_id, quiet=True)
