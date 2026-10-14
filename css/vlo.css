@@ -669,6 +669,27 @@
   :root[data-theme="dark"] .readiness-flag { color: #F08A84; }
   .activity-time { margin-left: auto; white-space: nowrap; }
 
+  /* ---- managing people, leaving the team ---- */
+  .person-row.has-manage > .person-open { flex: 1; width: auto; }
+  .person-manage { margin-left: 4px; font-size: 0.84rem; white-space: nowrap; }
+  .manage-panel { flex-basis: 100%; margin: 4px 0 4px 44px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+  .role-choices { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .role-choices .team-desc-label { margin: 0 6px 0 0; }
+  .role-choice { border: 1px solid var(--border); background: transparent; color: var(--fg); padding: 5px 12px; border-radius: 3px; font: inherit; font-size: 0.84rem; cursor: pointer; }
+  .role-choice:hover { border-color: var(--accent); color: var(--accent); }
+  .role-choice[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); cursor: default; }
+  .manage-panel > .danger-link { margin-top: 12px; }
+  .text-link.danger-link { color: #C2373F; }
+  .text-link.danger-link:hover { color: #E0505A; }
+  .btn-danger { display: inline-flex; align-items: center; background: #C2373F; color: #fff; border: none; padding: 9px 16px; border-radius: 3px; font: inherit; font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+  .btn-danger:hover { background: #A82F36; }
+  .team-confirm { margin-top: 10px; padding: 12px 14px; border: 1px solid color-mix(in srgb, #C2373F 40%, var(--border)); border-radius: 4px; background: color-mix(in srgb, #C2373F 6%, transparent); max-width: 560px; }
+  .team-confirm[hidden] { display: none; }
+  .team-confirm p { font-size: 0.9rem; margin: 0 0 10px; }
+  .team-confirm .log-row { gap: 8px; }
+  .team-leave { padding: 4px 2px; }
+  .team-leave .danger-link[hidden] { display: none; }
+
   /* ---- Today's session ---- */
   #todayCard .eyebrow { margin: 0; }
   .today-workout { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }

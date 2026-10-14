@@ -18,6 +18,10 @@ function roleLabel(role) {
   return role === "member" ? "athlete" : role;
 }
 
+function isTeamAdmin() {
+  return !!(currentTeam && currentTeam.role === "admin");
+}
+
 // Small DOM helper: el("p", "class", "text"). Always textContent, never HTML,
 // because names and descriptions are typed by users.
 function el(tag, className, text) {
@@ -368,6 +372,14 @@ function personRow(m) {
     li.appendChild(name);
     li.appendChild(meta);
   }
+  // Admins manage everyone else: role and removing. (Yourself: "Leave team".)
+  if (isTeamAdmin() && !isMe) {
+    li.classList.add("has-manage");
+    var manage = button("Manage", "text-link person-manage", function () { toggleManage(li, m); });
+    manage.setAttribute("aria-expanded", "false");
+    manage.setAttribute("aria-label", "Manage " + m.full_name);
+    li.appendChild(manage);
+  }
   return li;
 }
 
@@ -592,7 +604,7 @@ function renderTeamLook() {
   if (!currentTeam) { authEl("teamLookPanel").hidden = true; return; }
 
   logo.innerHTML = "";
-  logo.textContent = currentTeam.teamName.trim().charAt(0).toUpperCase();
+  logo.textContent = (currentTeam.teamName || "?").trim().charAt(0).toUpperCase();
   logo.classList.remove("has-photo");
   var forPath = currentTeam.logo_path;
   teamPictureUrl(forPath).then(function (url) {
@@ -815,6 +827,109 @@ function openMyWorkout(workoutId) {
   showPlans();
   window.scrollTo(0, 0);
 }
+
+/* ---- managing people (admins): role, remove; and leaving the team ----
+   The database already allows exactly this: admins change roles and remove
+   members, anyone can leave. A database rule (2026-10-14-keep-an-admin.sql)
+   stops a team from losing its last admin. */
+var ROLE_CHOICES = [{ role: "member", label: "Athlete" }, { role: "coach", label: "Coach" }, { role: "admin", label: "Admin" }];
+
+function toggleManage(li, m) {
+  var open = li.querySelector(".manage-panel");
+  var btn = li.querySelector(".person-manage");
+  if (open) { open.remove(); btn.setAttribute("aria-expanded", "false"); return; }
+  btn.setAttribute("aria-expanded", "true");
+  var panel = el("div", "manage-panel");
+  var status = el("p", "log-note");
+
+  var roles = el("div", "role-choices");
+  roles.setAttribute("role", "radiogroup");
+  roles.setAttribute("aria-label", "Role for " + m.full_name);
+  roles.appendChild(el("span", "team-desc-label", "Role"));
+  ROLE_CHOICES.forEach(function (c) {
+    var b = button(c.label, "role-choice", function () {
+      if (c.role === m.role) return;
+      status.textContent = "Saving\u2026";
+      setMemberRole(m, c.role).then(function (err) { if (err) status.textContent = err; });
+    });
+    b.setAttribute("role", "radio");
+    b.setAttribute("aria-checked", String(c.role === m.role));
+    roles.appendChild(b);
+  });
+  panel.appendChild(roles);
+
+  var remove = button("Remove from team", "text-link danger-link", function () {
+    remove.hidden = true;
+    var confirm = el("div", "team-confirm");
+    confirm.appendChild(el("p", "", "Remove " + m.full_name + " from " + currentTeam.teamName + "? They lose access to the team page and " +
+      "its coaches can no longer see their training. Their own training data stays theirs. You can invite them again later."));
+    var row = el("div", "log-row");
+    row.appendChild(button("Remove", "btn-danger", function () {
+      status.textContent = "Removing\u2026";
+      removeMember(m).then(function (err) { if (err) status.textContent = err; });
+    }));
+    row.appendChild(button("Cancel", "btn-ghost", function () { confirm.remove(); remove.hidden = false; }));
+    confirm.appendChild(row);
+    panel.insertBefore(confirm, status);
+  });
+  panel.appendChild(remove);
+  panel.appendChild(status);
+  li.appendChild(panel);
+}
+
+var LAST_ADMIN_MSG = "A team needs at least one admin. Make someone else admin first.";
+function memberError(res, fallback) {
+  if (res.error) return /at least one admin/i.test(res.error.message) ? LAST_ADMIN_MSG : res.error.message;
+  // The database answers with no rows (not an error) when something isn't allowed.
+  if (!res.data || !res.data.length) return fallback;
+  return null;
+}
+
+function setMemberRole(m, role) {
+  return sb.from("team_members").update({ role: role })
+    .eq("team_id", currentTeam.team_id).eq("user_id", m.user_id).select("role")
+    .then(function (res) {
+      var err = memberError(res, "Couldn't change the role: only admins can do that.");
+      if (!err) { setTeamNotice(m.full_name + " is now " + (role === "member" ? "an athlete" : "a" + (role === "admin" ? "n " : " ") + role) + "."); loadRoster(); }
+      return err;
+    });
+}
+
+function removeMember(m) {
+  return sb.from("team_members").delete()
+    .eq("team_id", currentTeam.team_id).eq("user_id", m.user_id).select("user_id")
+    .then(function (res) {
+      var err = memberError(res, "Couldn't remove them: only admins can do that.");
+      if (!err) { setTeamNotice(m.full_name + " was removed from the team."); loadRoster(); loadStats(); loadWeeklyVolume(); loadTopPrs(); }
+      return err;
+    });
+}
+
+function closeLeaveConfirm() {
+  authEl("leaveTeamConfirm").hidden = true;
+  authEl("leaveTeamBtn").hidden = false;
+  authEl("leaveTeamStatus").textContent = "";
+}
+authEl("leaveTeamBtn").addEventListener("click", function () {
+  if (!currentTeam) return;
+  authEl("leaveTeamText").textContent = "Leave " + currentTeam.teamName + "? You lose access to the team page and its coaches " +
+    "can no longer see your training. Your own training data stays yours. To come back you need a new invite or join request.";
+  authEl("leaveTeamConfirm").hidden = false;
+  authEl("leaveTeamBtn").hidden = true;
+});
+authEl("leaveTeamNo").addEventListener("click", closeLeaveConfirm);
+authEl("leaveTeamYes").addEventListener("click", function () {
+  var team = currentTeam;
+  authEl("leaveTeamStatus").textContent = "Leaving\u2026";
+  sb.from("team_members").delete().eq("team_id", team.team_id).eq("user_id", currentUser.id).select("user_id").then(function (res) {
+    var err = memberError(res, "Couldn't leave the team.");
+    if (err) { authEl("leaveTeamStatus").textContent = err; return; }
+    closeLeaveConfirm();
+    authNotice = "You left " + team.teamName + ".";
+    // Load the account again: no team now, so the page shows team search.
+    loadMembership(currentUser).then(function () { if (!teamViewEl.hidden) renderTeamPage(); });
+  });
+});
 
 /* ---- stats ---- */
 var lastStats = [];
