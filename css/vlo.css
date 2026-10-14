@@ -629,6 +629,20 @@
   .person-open:hover .person-name { color: var(--accent); }
   .person-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
   .person-arrow { margin-left: auto; color: var(--muted); }
+  .person-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .person-line { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .readiness-flag {
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.78rem;
+    background: color-mix(in srgb, #D93A3A 12%, transparent);
+    color: #B5302F;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .readiness-flag { color: #F08A84; } }
+  :root[data-theme="dark"] .readiness-flag { color: #F08A84; }
+  .activity-time { margin-left: auto; white-space: nowrap; }
   .person-avatar {
     flex: none;
     display: inline-flex;

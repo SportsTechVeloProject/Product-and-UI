@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="css/vlo.css?v=3">
+<link rel="stylesheet" href="css/vlo.css?v=4">
 
 <div id="marketingView">
 <nav class="top">
@@ -602,6 +602,13 @@
         </div>
       </div>
 
+      <!-- Coaches/admins only: the team's latest training, newest first. -->
+      <div class="team-card" id="activityCard" hidden>
+        <h3>Recent activity</h3>
+        <p class="chart-caption">The team's latest training, grouped per person and exercise. Only coaches and admins see this.</p>
+        <ul class="people-list" id="activityList"></ul>
+      </div>
+
       <section class="team-card" id="athleteProgress" hidden>
         <div class="team-card-head">
           <div>
@@ -795,18 +802,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Load order matters: core defines what the others use, app wires it together.
      ?v=N makes browsers that cached an older copy download the files again. -->
-<script src="js/core.js?v=3"></script>
-<script src="js/charts.js?v=3"></script>
-<script src="js/sensors.js?v=3"></script>
-<script src="js/exercises.js?v=3"></script>
-<script src="js/plans.js?v=3"></script>
-<script src="js/auth.js?v=3"></script>
-<script src="js/team.js?v=3"></script>
-<script src="js/mysets.js?v=3"></script>
-<script src="js/coachplans.js?v=3"></script>
-<script src="js/recorder.js?v=3"></script>
-<script src="js/recordings.js?v=3"></script>
-<script src="js/vbt.js?v=3"></script>
-<script src="js/training.js?v=3"></script>
-<script src="js/app.js?v=3"></script>
+<script src="js/core.js?v=4"></script>
+<script src="js/charts.js?v=4"></script>
+<script src="js/sensors.js?v=4"></script>
+<script src="js/exercises.js?v=4"></script>
+<script src="js/plans.js?v=4"></script>
+<script src="js/auth.js?v=4"></script>
+<script src="js/team.js?v=4"></script>
+<script src="js/mysets.js?v=4"></script>
+<script src="js/coachplans.js?v=4"></script>
+<script src="js/recorder.js?v=4"></script>
+<script src="js/recordings.js?v=4"></script>
+<script src="js/vbt.js?v=4"></script>
+<script src="js/training.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
 </body></html>

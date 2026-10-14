@@ -109,6 +109,7 @@ function renderTeamPage() {
 
   var staff = isTeamStaff();
   if (!staff) authEl("joinRequestsCard").hidden = true;
+  authEl("activityCard").hidden = true;
   setAddPeopleOpen(false);
   authEl("addPeopleTitle").textContent = staff ? "Add people" : "Suggest someone";
   authEl("addPeopleToggle").textContent = staff ? "+ Add people" : "+ Suggest someone";
@@ -231,14 +232,24 @@ function loadRoster() {
     athletes.innerHTML = "";
     if (res.error) { coaches.appendChild(el("li", "log-note", res.error.message)); return; }
     lastRoster = res.data || [];
-    lastRoster.forEach(function (m) {
-      var list = m.role === "member" ? athletes : coaches;
-      list.appendChild(personRow(m));
-    });
-    if (!coaches.children.length) coaches.appendChild(el("li", "log-note", "No coaches yet."));
-    if (!athletes.children.length) athletes.appendChild(el("li", "log-note", "No athletes yet. Add some below."));
+    activityByUser = {};
+    renderRosterLists();
     renderStatTiles();
+    loadActivity();
   });
+}
+
+function renderRosterLists() {
+  var coaches = authEl("coachList");
+  var athletes = authEl("athleteList");
+  coaches.innerHTML = "";
+  athletes.innerHTML = "";
+  lastRoster.forEach(function (m) {
+    var list = m.role === "member" ? athletes : coaches;
+    list.appendChild(personRow(m));
+  });
+  if (!coaches.children.length) coaches.appendChild(el("li", "log-note", "No coaches yet."));
+  if (!athletes.children.length) athletes.appendChild(el("li", "log-note", "No athletes yet. Add some below."));
 }
 
 // Round initial, like the profile icon top right.
@@ -258,8 +269,19 @@ function personRow(m) {
     var b = el("button", "person-open");
     b.type = "button";
     b.appendChild(avatar(m.full_name, isMe));
-    b.appendChild(name);
-    b.appendChild(meta);
+    // Name and role on the first line; training status and readiness
+    // flags below (only loaded for people you're allowed to see).
+    var text = el("span", "person-text");
+    var top = el("span", "person-line");
+    top.appendChild(name);
+    top.appendChild(meta);
+    text.appendChild(top);
+    var act = activityByUser[m.user_id];
+    if (act) {
+      text.appendChild(el("span", "person-meta person-activity", activitySummary(act)));
+      act.flags.forEach(function (f) { text.appendChild(el("span", "readiness-flag", "\u26a0 " + f)); });
+    }
+    b.appendChild(text);
     b.appendChild(el("span", "person-arrow", "→"));
     b.setAttribute("aria-label", "Show progress for " + m.full_name);
     b.addEventListener("click", function () { showProgress(m); });
@@ -270,6 +292,206 @@ function personRow(m) {
     li.appendChild(meta);
   }
   return li;
+}
+
+/* ---- training status, readiness and recent activity ----
+   Read straight from set_logs and sessions: the database's own rules let
+   coaches/admins read their athletes' training and everyone read their
+   own, so athletes only ever get their own status. */
+var ACTIVITY_DAYS = 56;       // how far back to look (baseline for readiness)
+var READINESS_DROP = 0.08;    // flag when a set is this much slower than usual at that load
+var READINESS_RECENT_DAYS = 7; // only flag sets from the last week
+var HIGH_VELOCITY_LOSS = 0.35; // flag a set whose last rep is this much slower than the first (placeholder)
+var activityByUser = {};      // user id -> { last, daysThisWeek, flags }
+
+function setSpeed(reps) {
+  var v = reps.map(repMeanSpeed).filter(function (x) { return x !== null; });
+  return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+}
+
+function loadActivity() {
+  if (!currentTeam || !currentUser) return;
+  var teamId = currentTeam.team_id;
+  var staff = isTeamStaff();
+  var ids = staff ? lastRoster.map(function (m) { return m.user_id; }) : [currentUser.id];
+  if (!ids.length) return;
+  var since = new Date(Date.now() - ACTIVITY_DAYS * 86400000).toISOString();
+  Promise.all([
+    sb.from("set_logs").select("id, athlete_id, exercise, weight_kg, reps, duration_s, distance_m, done_at, recording_id")
+      .in("athlete_id", ids).gte("done_at", since).order("done_at", { ascending: false }),
+    sb.from("sessions").select("id, user_id, exercise, weight_kg, recorded_at, reported_rep_count, " +
+                               "reps(rep_index, left_mean_velocity, right_mean_velocity)")
+      .in("user_id", ids).gte("recorded_at", since).order("recorded_at", { ascending: false })
+  ]).then(function (results) {
+    if (!currentTeam || currentTeam.team_id !== teamId) return;
+    var logs = results[0].error ? [] : (results[0].data || []);
+    var recs = results[1].error ? [] : (results[1].data || []);
+    var events = trainingEvents(logs, recs);
+
+    activityByUser = {};
+    ids.forEach(function (id) {
+      var mine = events.filter(function (e) { return e.user_id === id; });
+      activityByUser[id] = {
+        last: mine.length ? mine[0].time : null,
+        daysThisWeek: trainingDaysThisWeek(mine),
+        flags: readinessFlags(recs.filter(function (r) { return r.user_id === id; }))
+      };
+    });
+    renderRosterLists();
+    if (staff) renderActivityFeed(events);
+  });
+}
+
+// One list of sets, newest first: sets ticked off in Training, plus sensor
+// recordings that don't belong to one of those (so nothing counts twice).
+function trainingEvents(logs, recs) {
+  var recById = {};
+  recs.forEach(function (r) { recById[r.id] = r; });
+  var linked = {};
+  var events = logs.map(function (l) {
+    var rec = l.recording_id ? recById[l.recording_id] : null;
+    if (l.recording_id) linked[l.recording_id] = true;
+    return { user_id: l.athlete_id, time: new Date(l.done_at), exercise: l.exercise,
+             kg: l.weight_kg === null ? null : Number(l.weight_kg), reps: l.reps,
+             duration: l.duration_s, distance: l.distance_m, speed: rec ? setSpeed(rec.reps) : null };
+  });
+  recs.forEach(function (r) {
+    if (linked[r.id]) return;
+    events.push({ user_id: r.user_id, time: new Date(r.recorded_at), exercise: exerciseName(r.exercise),
+                  kg: r.weight_kg === null ? null : Number(r.weight_kg),
+                  reps: r.reps.length || r.reported_rep_count, speed: setSpeed(r.reps) });
+  });
+  return events.sort(function (a, b) { return b.time - a.time; });
+}
+
+function trainingDaysThisWeek(events) {
+  var now = new Date();
+  var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() + 6) % 7);
+  var days = {};
+  events.forEach(function (e) { if (e.time >= monday) days[localDayString(e.time)] = true; });
+  return Object.keys(days).length;
+}
+
+function timeAgo(date) {
+  var mins = Math.round((Date.now() - date) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + " min ago";
+  var hours = Math.round(mins / 60);
+  if (hours < 24) return hours + " h ago";
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  var days = Math.round((today - new Date(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000);
+  if (days <= 1) return "yesterday";
+  return days + " days ago";
+}
+
+function activitySummary(act) {
+  if (!act.last) return "No training in the last " + Math.round(ACTIVITY_DAYS / 7) + " weeks";
+  return "Last trained " + timeAgo(act.last) + " \u00b7 " + act.daysThisWeek + " day" + (act.daysThisWeek === 1 ? "" : "s") + " this week";
+}
+
+// Readiness: is the person's latest recorded set of a lift clearly slower
+// than their own earlier sets at that load? The expected speed comes from a
+// straight line through their earlier sets (load vs speed), or from earlier
+// sets at the same weight. Also flags a set where the bar slowed down a lot
+// from the first to the last rep. Only recordings with measured reps count.
+function readinessFlags(recs) {
+  var flags = [];
+  var byLift = {};
+  recs.forEach(function (r) {
+    var v = setSpeed(r.reps);
+    if (v === null || r.weight_kg === null) return;
+    (byLift[r.exercise] = byLift[r.exercise] || []).push({ kg: Number(r.weight_kg), v: v, time: new Date(r.recorded_at), reps: r.reps });
+  });
+  Object.keys(byLift).forEach(function (key) {
+    if (!analyzedLift(EXERCISE_BY_KEY[key])) return;
+    var sets = byLift[key].sort(function (a, b) { return a.time - b.time; });
+    var latest = sets[sets.length - 1];
+    if (Date.now() - latest.time > READINESS_RECENT_DAYS * 86400000) return;
+    var name = exerciseName(key);
+
+    var day = localDayString(latest.time);
+    var before = sets.filter(function (s) { return localDayString(s.time) !== day; });
+    var expected = expectedSpeed(before, latest.kg);
+    if (expected !== null && expected > 0) {
+      var drop = (expected - latest.v) / expected;
+      if (drop > READINESS_DROP) {
+        flags.push(Math.round(drop * 100) + "% slower than usual on " + name.toLowerCase() + " at " + formatKg(latest.kg));
+      }
+    }
+
+    var reps = latest.reps.slice().sort(function (a, b) { return a.rep_index - b.rep_index; });
+    var first = reps.length >= 3 ? repMeanSpeed(reps[0]) : null;
+    var last = reps.length >= 3 ? repMeanSpeed(reps[reps.length - 1]) : null;
+    if (first && last !== null && (first - last) / first > HIGH_VELOCITY_LOSS) {
+      flags.push("High fatigue in last " + name.toLowerCase() + " set (" + Math.round((first - last) / first * 100) + "% velocity loss)");
+    }
+  });
+  return flags;
+}
+
+// Speed expected at kg from earlier sets: a least-squares line when there are
+// at least 3 sets over 2+ weights and kg is within (or near) that range,
+// otherwise the average of earlier sets within 2.5 kg. Null if neither.
+function expectedSpeed(sets, kg) {
+  var near = sets.filter(function (s) { return Math.abs(s.kg - kg) <= 2.5; });
+  var kgs = sets.map(function (s) { return s.kg; });
+  var lo = Math.min.apply(null, kgs), hi = Math.max.apply(null, kgs);
+  if (sets.length >= 3 && hi > lo && kg >= lo * 0.9 && kg <= hi * 1.1) {
+    var n = sets.length;
+    var mx = kgs.reduce(function (a, b) { return a + b; }, 0) / n;
+    var my = sets.reduce(function (a, s) { return a + s.v; }, 0) / n;
+    var sxy = 0, sxx = 0;
+    sets.forEach(function (s) { sxy += (s.kg - mx) * (s.v - my); sxx += (s.kg - mx) * (s.kg - mx); });
+    var slope = sxy / sxx;
+    if (slope < 0) return my + slope * (kg - mx); // heavier should mean slower
+  }
+  if (near.length >= 2) return near.reduce(function (a, s) { return a + s.v; }, 0) / near.length;
+  return null;
+}
+
+// Coaches' feed: the latest training, grouped per person, exercise and day.
+var ACTIVITY_FEED_SIZE = 10;
+function renderActivityFeed(events) {
+  var card = authEl("activityCard");
+  var list = authEl("activityList");
+  list.innerHTML = "";
+  card.hidden = false;
+  var groups = [];
+  var byKey = {};
+  events.forEach(function (e) {
+    var key = e.user_id + "|" + e.exercise.toLowerCase() + "|" + localDayString(e.time);
+    if (!byKey[key]) { byKey[key] = { first: e, sets: [] }; groups.push(byKey[key]); }
+    byKey[key].sets.push(e);
+  });
+  if (!groups.length) { list.appendChild(el("li", "log-note", "No training logged in the last " + Math.round(ACTIVITY_DAYS / 7) + " weeks.")); return; }
+  groups.slice(0, ACTIVITY_FEED_SIZE).forEach(function (g) {
+    var member = lastRoster.filter(function (m) { return m.user_id === g.first.user_id; })[0];
+    var who = member ? member.full_name : "Someone";
+    var isMe = currentUser && g.first.user_id === currentUser.id;
+    var li = el("li", "person-row");
+    li.appendChild(avatar(who, isMe));
+    var text = el("span", "person-text");
+    var top = el("span", "person-line");
+    top.appendChild(el("span", "person-name", who + (isMe ? " (you)" : "")));
+    top.appendChild(el("span", "person-meta", g.first.exercise));
+    text.appendChild(top);
+    text.appendChild(el("span", "person-meta", setGroupSummary(g.sets)));
+    li.appendChild(text);
+    li.appendChild(el("span", "person-meta activity-time", timeAgo(g.first.time)));
+    list.appendChild(li);
+  });
+}
+
+// "3 sets · top 140 kg × 3 · best set avg 0.52 m/s"
+function setGroupSummary(sets) {
+  var parts = [sets.length + " set" + (sets.length === 1 ? "" : "s")];
+  var top = sets.slice().sort(function (a, b) { return (b.kg || 0) - (a.kg || 0) || (b.reps || 0) - (a.reps || 0); })[0];
+  if (top.kg) parts.push("top " + formatKg(top.kg) + (top.reps ? " \u00d7 " + top.reps : ""));
+  else if (top.reps) parts.push(top.reps + " reps");
+  else if (top.duration) parts.push(formatDuration(top.duration) + (top.distance ? " \u00b7 " + Math.round(top.distance) + " m" : ""));
+  var speeds = sets.map(function (s) { return s.speed; }).filter(function (v) { return v !== null && v !== undefined; });
+  if (speeds.length) parts.push("best set avg " + Math.max.apply(null, speeds).toFixed(2) + " m/s");
+  return parts.join(" \u00b7 ");
 }
 
 /* ---- stats ---- */
