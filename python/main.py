@@ -15,6 +15,7 @@ below) and look at the data between steps.
 Usage (needs numpy, scipy, pandas, matplotlib, imufusion):
   python main.py recording.csv --weight 100 --reps 11      # the whole chain
   python main.py recording.csv --dry-run                   # steps 1 and 3 only, nothing stored
+  python main.py recording.csv --reps 6 --store-only       # step 2 only: upload like the website; Azure analyzes it
   python main.py --session <id>                            # steps 3-5 for an existing session
   python main.py --session <id> --replace                  # same, replacing its reps
   add --plot to any of them to see the data team's plots
@@ -39,10 +40,12 @@ import csv
 import datetime
 import getpass
 import json
+import logging
 import math
 import os
 import sys
 import time
+import traceback
 import urllib.parse
 import uuid
 
@@ -100,7 +103,7 @@ def to_number(value):
 # 2. Store it ("Stop pressed")
 # ============================================================
 
-def store_session(token, user_id, samples, exercise, weight_kg=None, reps=None):
+def store_session(token, user_id, samples, exercise, weight_kg=None, reps=None, zone=None):
     """Uploads the raw JSON to Storage and creates the sessions row. Returns session_id."""
     session_id = str(uuid.uuid4())
     raw_path = "%s/%s.json" % (user_id, session_id)
@@ -115,6 +118,7 @@ def store_session(token, user_id, samples, exercise, weight_kg=None, reps=None):
             "reported_rep_count": reps,
             "recorded_at": recorded_at(samples),
             "raw_data_path": raw_path,
+            "target_zone": zone,
         }])
     except db.SupabaseError:
         db.delete_raw(token, raw_path)  # don't leave an orphaned file behind
@@ -146,7 +150,7 @@ def process_session(token, session_id, plot=False):
     print("3. Downloaded %d samples for session %s (%s) from %s/%s" % (
         len(samples), session_id, session["exercise"], db.RAW_BUCKET, session["raw_data_path"]))
     print("   Target zone: %s" % (session.get("target_zone") or "none"))
-    return analyze(samples, session["exercise"], session["reported_rep_count"], plot)
+    return analyze(samples, session["exercise"], session["reported_rep_count"], plot, session.get("target_zone"))
 
 
 NO_ANALYSIS_YET = "No analysis for "  # marker in sessions.analysis_error; see watch()
@@ -156,10 +160,10 @@ class NoAnalysisYet(Exception):
     """The lift can be recorded but nobody has written its analysis yet."""
 
 
-def analyze(samples, exercise, reps=None, plot=False):
+def analyze(samples, exercise, reps=None, plot=False, zone=None):
     if exercise not in EXERCISES:
         raise NoAnalysisYet("%s%s yet (have: %s)." % (NO_ANALYSIS_YET, exercise, ", ".join(sorted(EXERCISES))))
-    results = EXERCISES[exercise](samples, reps=reps, plot=plot)
+    results = EXERCISES[exercise](samples, reps=reps, zone=zone, plot=plot)
     print("   Processed with %s: %d reps" % (results["version"], len(results["reps"])))
     return results
 
@@ -228,9 +232,10 @@ def fmt(v):
 # 6. The processing watcher
 # ============================================================
 
-WAITING = ("select=id,user_id,exercise,reported_rep_count,raw_data_path,recorded_at,target_zone"
-           "&analyzed_at=is.null&analysis_error=is.null&raw_data_path=not.is.null"
-           "&order=recorded_at.asc&limit=10")
+# Recordings waiting to be analyzed (also used by function_app.py on Azure).
+WAITING_FIELDS = "select=id,user_id,exercise,reported_rep_count,raw_data_path,recorded_at,target_zone"
+WAITING_FILTER = "&analyzed_at=is.null&analysis_error=is.null&raw_data_path=not.is.null"
+WAITING = WAITING_FIELDS + WAITING_FILTER + "&order=recorded_at.asc&limit=10"
 
 
 def watch(interval):
@@ -255,14 +260,18 @@ def watch(interval):
         print("\nStopped watching.")
 
 
-def process_waiting(session):
-    """Analyzes one recording from the website and saves its reps."""
+def process_waiting(session, raise_transient=False):
+    """Analyzes one recording from the website and saves its reps.
+
+    A temporary error (network, Supabase busy) leaves the recording waiting so
+    it's tried again; with raise_transient it's raised too, so Azure's queue
+    retries it (function_app.py). Any other error is saved as analysis_error."""
     started = time.time()
     sid = session["id"]
     label = "%s %s" % (sid[:8], session["exercise"])
     try:
         samples = db.download_raw(None, session["raw_data_path"])
-        results = analyze(samples, session["exercise"], session["reported_rep_count"])
+        results = analyze(samples, session["exercise"], session["reported_rep_count"], zone=session.get("target_zone"))
         save_reps(None, sid, results, replace=True)
         mark_analyzed(None, sid)
         took = time.time() - started
@@ -278,13 +287,44 @@ def process_waiting(session):
         except (db.SupabaseError, OSError):
             pass
         print("WAITING %s: %s" % (label, err))
-    except (Exception, SystemExit) as err:
-        reason = (str(err) or err.__class__.__name__).strip()[:500]
-        try:
-            mark_analyzed(None, sid, error=reason)
-        except (db.SupabaseError, OSError):
-            pass
-        print("FAILED  %s: %s" % (label, reason))
+    except Exception as err:
+        if not db.is_transient(err):
+            fail(sid, label, err)
+            return
+        print("RETRY   %s: %s" % (label, str(err)[:300]))
+        if raise_transient:
+            raise
+    except SystemExit as err:
+        fail(sid, label, err)
+
+
+def fail(sid, label, err):
+    """Saves why a recording couldn't be analyzed; the website shows it.
+    Adds where in the code it failed; the full traceback goes to the log
+    (Azure: Log stream / Application Insights)."""
+    reason = (str(err) or err.__class__.__name__).strip()
+    where = failed_at(err)
+    if where:
+        reason += " [at " + where + "]"
+    try:
+        mark_analyzed(None, sid, error=reason[:1000])
+    except (db.SupabaseError, OSError):
+        pass
+    print("FAILED  %s: %s" % (label, reason))
+    logging.error("FAILED %s", label, exc_info=(type(err), err, err.__traceback__))
+
+
+def failed_at(err):
+    """'VelocityCalculations.py:34 find_drift': where the error started (the
+    original error if it was re-raised with a clearer message)."""
+    cause = err.__cause__ or err
+    frames = traceback.extract_tb(cause.__traceback__) if cause.__traceback__ else []
+    if not frames:
+        return ""
+    # Prefer the deepest frame in the data team's files (python/squat/).
+    theirs = [f for f in frames if os.path.basename(os.path.dirname(f.filename)) == "squat"]
+    f = (theirs or frames)[-1]
+    return "%s:%d %s" % (os.path.basename(f.filename), f.lineno, f.name)
 
 
 def retry_new_analyses():
@@ -326,7 +366,10 @@ def main():
     parser.add_argument("--session", help="process an existing session instead of storing a new one")
     parser.add_argument("--replace", action="store_true", help="replace reps that already exist")
     parser.add_argument("--dry-run", action="store_true", help="load and process only; nothing stored")
+    parser.add_argument("--store-only", action="store_true",
+                        help="upload the recording like the website does and stop; the processing on Azure analyzes it")
     parser.add_argument("--plot", action="store_true", help="show the data team's plots")
+    parser.add_argument("--zone", help="target zone for a local file, e.g. \"Strength–speed\" (default: none)")
     parser.add_argument("--watch", action="store_true", help="keep processing new recordings from the website")
     parser.add_argument("--interval", type=float, default=2.0, help="with --watch: seconds between checks (default 2)")
     args = parser.parse_args()
@@ -339,7 +382,7 @@ def main():
 
     if args.dry_run:
         samples = load_recording(args.recording)
-        print_summary(analyze(samples, args.exercise, args.reps, args.plot))
+        print_summary(analyze(samples, args.exercise, args.reps, args.plot, args.zone))
         print("\nDry run: nothing was stored.")
         return
 
@@ -348,7 +391,11 @@ def main():
         session_id = args.session
         if not session_id:
             samples = load_recording(args.recording)
-            session_id = store_session(token, user_id, samples, args.exercise, args.weight, args.reps)
+            session_id = store_session(token, user_id, samples, args.exercise, args.weight, args.reps, args.zone)
+            if args.store_only:
+                print("\nStored only: Azure analyzes it now (Supabase webhook). Watch it with:\n"
+                      "  select analyzed_at, analysis_error from sessions where id = '%s';" % session_id)
+                return
         results = process_session(token, session_id, args.plot)
         save_reps(token, session_id, results, args.replace)
         mark_analyzed(token, session_id, quiet=True)
