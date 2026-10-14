@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="css/vlo.css?v=11">
+<link rel="stylesheet" href="css/vlo.css?v=12">
 
 <div id="marketingView">
 <nav class="top">
@@ -546,7 +546,7 @@
 
    <div id="teamView" hidden>
 
-    <section class="app-hero">
+    <section class="app-hero team-hero">
       <div>
         <div class="team-title-row">
           <!-- Team picture (members only), or the team's initial in its colour. -->
@@ -575,6 +575,19 @@
         <div class="team-desc team-desc-private" data-desc="private_description" hidden></div>
         <p class="exit-link"><a href="#" id="teamBack">← Back to training</a></p>
       </div>
+
+      <!-- Today's session: your plan for today (athletes), or who has a
+           session today and who has trained (coaches/admins). -->
+      <div class="team-card" id="todayCard" hidden>
+        <div class="team-card-head">
+          <div>
+            <p class="eyebrow" id="todayEyebrow">Today</p>
+            <h3 id="todayTitle">Today's session</h3>
+          </div>
+        </div>
+        <p class="chart-caption" id="todaySummary"></p>
+        <div id="todayBody"></div>
+      </div>
     </section>
 
     <p class="team-notice" id="teamNotice" hidden></p>
@@ -602,19 +615,6 @@
         <h3>Join requests <span class="count-badge" id="joinRequestCount"></span></h3>
         <p class="chart-caption">People asking to join. Accept to add them as athletes.</p>
         <ul class="people-list" id="joinRequestList"></ul>
-      </div>
-
-      <!-- Today's session: your plan for today (athletes), or who has a
-           session today and who has trained (coaches/admins). -->
-      <div class="team-card" id="todayCard" hidden>
-        <div class="team-card-head">
-          <div>
-            <p class="eyebrow" id="todayEyebrow">Today</p>
-            <h3 id="todayTitle">Today's session</h3>
-          </div>
-        </div>
-        <p class="chart-caption" id="todaySummary"></p>
-        <div id="todayBody"></div>
       </div>
 
       <div class="team-stats" id="teamStats"></div>
@@ -863,18 +863,18 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Load order matters: core defines what the others use, app wires it together.
      ?v=N makes browsers that cached an older copy download the files again. -->
-<script src="js/core.js?v=11"></script>
-<script src="js/charts.js?v=11"></script>
-<script src="js/sensors.js?v=11"></script>
-<script src="js/exercises.js?v=11"></script>
-<script src="js/plans.js?v=11"></script>
-<script src="js/auth.js?v=11"></script>
-<script src="js/team.js?v=11"></script>
-<script src="js/mysets.js?v=11"></script>
-<script src="js/coachplans.js?v=11"></script>
-<script src="js/recorder.js?v=11"></script>
-<script src="js/recordings.js?v=11"></script>
-<script src="js/vbt.js?v=11"></script>
-<script src="js/training.js?v=11"></script>
-<script src="js/app.js?v=11"></script>
+<script src="js/core.js?v=12"></script>
+<script src="js/charts.js?v=12"></script>
+<script src="js/sensors.js?v=12"></script>
+<script src="js/exercises.js?v=12"></script>
+<script src="js/plans.js?v=12"></script>
+<script src="js/auth.js?v=12"></script>
+<script src="js/team.js?v=12"></script>
+<script src="js/mysets.js?v=12"></script>
+<script src="js/coachplans.js?v=12"></script>
+<script src="js/recorder.js?v=12"></script>
+<script src="js/recordings.js?v=12"></script>
+<script src="js/vbt.js?v=12"></script>
+<script src="js/training.js?v=12"></script>
+<script src="js/app.js?v=12"></script>
 </body></html>

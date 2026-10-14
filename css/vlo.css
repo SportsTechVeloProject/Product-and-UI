@@ -691,6 +691,9 @@
   .team-leave .danger-link[hidden] { display: none; }
 
   /* ---- Today's session ---- */
+  /* Sits to the right of the team name and descriptions; drops below on narrow screens. */
+  .team-hero > div:first-child { flex: 1 1 320px; min-width: 0; }
+  .team-hero > #todayCard { flex: 1 1 420px; max-width: 600px; margin: 0; }
   #todayCard .eyebrow { margin: 0; }
   .today-workout { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
   .today-workout:first-child { border-top: none; padding-top: 0; }
