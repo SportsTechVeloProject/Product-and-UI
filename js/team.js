@@ -108,8 +108,10 @@ function renderTeamPage() {
   renderDescriptions();
 
   var staff = isTeamStaff();
-  authEl("joinRequestsCard").hidden = !staff;
-  authEl("addPeopleTitle").textContent = staff ? "Add athlete" : "Suggest someone";
+  if (!staff) authEl("joinRequestsCard").hidden = true;
+  setAddPeopleOpen(false);
+  authEl("addPeopleTitle").textContent = staff ? "Add people" : "Suggest someone";
+  authEl("addPeopleToggle").textContent = staff ? "+ Add people" : "+ Suggest someone";
   authEl("addPeopleHint").textContent = staff
     ? "Find someone who has an account and invite them. They'll see the invite when they open V-Lo and can accept or decline."
     : "Know someone who should train with the team? Suggest them. They can then ask to join, and a coach or admin decides.";
@@ -237,6 +239,13 @@ function loadRoster() {
   });
 }
 
+// Round initial, like the profile icon top right.
+function avatar(fullName, isMe) {
+  var a = el("span", "person-avatar" + (isMe ? " is-me" : ""), (fullName || "?").trim().charAt(0).toUpperCase());
+  a.setAttribute("aria-hidden", "true");
+  return a;
+}
+
 function personRow(m) {
   var li = el("li", "person-row");
   var isMe = currentUser && m.user_id === currentUser.id;
@@ -246,6 +255,7 @@ function personRow(m) {
   if (isTeamStaff() || isMe) {
     var b = el("button", "person-open");
     b.type = "button";
+    b.appendChild(avatar(m.full_name, isMe));
     b.appendChild(name);
     b.appendChild(meta);
     b.appendChild(el("span", "person-arrow", "→"));
@@ -253,6 +263,7 @@ function personRow(m) {
     b.addEventListener("click", function () { showProgress(m); });
     li.appendChild(b);
   } else {
+    li.appendChild(avatar(m.full_name, isMe));
     li.appendChild(name);
     li.appendChild(meta);
   }
@@ -284,9 +295,9 @@ function renderStatTiles() {
     var n = lastRoster.filter(function (m) { return m.role === role; }).length;
     return n ? n + " " + (n === 1 ? one : many) : "";
   }
-  var breakdown = [count("member", "athlete", "athletes"), count("coach", "coach", "coaches"), count("admin", "admin", "admins")]
-    .filter(Boolean).join(" · ");
-  box.appendChild(statTile("Players", String(lastRoster.length), breakdown));
+  var athletes = lastRoster.filter(function (m) { return m.role === "member"; }).length;
+  var staff = [count("coach", "coach", "coaches"), count("admin", "admin", "admins")].filter(Boolean).join(" · ");
+  box.appendChild(statTile("Athletes", String(athletes), staff ? "plus " + staff : ""));
   var totalKg = lastStats.reduce(function (sum, r) { return sum + Number(r.total_kg || 0); }, 0);
   var sessions = lastStats.reduce(function (sum, r) { return sum + r.sessions; }, 0);
   box.appendChild(statTile("Total lifted", formatKg(totalKg), sessions + " session" + (sessions === 1 ? "" : "s") + " · load × reps"));
@@ -447,6 +458,23 @@ function repDetail(session) {
 }
 
 /* ---- join requests (coaches/admins) ---- */
+// The card only shows while someone is waiting; the count also goes on the
+// team badge in the header so coaches notice from any tab.
+function setJoinRequestCount(n) {
+  pendingJoinCount = n;
+  authEl("joinRequestCount").textContent = n || "";
+  authEl("joinRequestsCard").hidden = !n || !isTeamStaff();
+  updateTeamBadge();
+}
+
+// Just the number, without loading the list (used when logging in).
+function refreshJoinRequestCount() {
+  if (!currentTeam || !isTeamStaff()) { setJoinRequestCount(0); return; }
+  sb.from("team_join_requests").select("id", { count: "exact", head: true })
+    .eq("team_id", currentTeam.team_id).eq("status", "pending")
+    .then(function (res) { if (!res.error) setJoinRequestCount(res.count || 0); });
+}
+
 function loadJoinRequests() {
   sb.from("team_join_requests")
     .select("id, created_at, invite_id, requester:profiles!team_join_requests_user_id_fkey(full_name)")
@@ -456,11 +484,13 @@ function loadJoinRequests() {
     .then(function (res) {
       var list = authEl("joinRequestList");
       list.innerHTML = "";
-      if (res.error) { list.appendChild(el("li", "log-note", res.error.message)); return; }
-      if (!res.data.length) { list.appendChild(el("li", "log-note", "No requests right now.")); return; }
+      if (res.error) { authEl("joinRequestsCard").hidden = false; list.appendChild(el("li", "log-note", res.error.message)); return; }
+      setJoinRequestCount(res.data.length);
       res.data.forEach(function (r) {
         var li = el("li", "person-row");
-        li.appendChild(el("span", "person-name", r.requester ? r.requester.full_name : "Someone"));
+        var who = r.requester ? r.requester.full_name : "Someone";
+        li.appendChild(avatar(who, false));
+        li.appendChild(el("span", "person-name", who));
         li.appendChild(el("span", "person-meta", r.invite_id ? "suggested by a teammate" : "found the team in search"));
         var actions = el("span", "person-actions");
         actions.appendChild(button("Accept", "btn", function () { answerRequest(r.id, true, li); }));
@@ -483,6 +513,15 @@ function answerRequest(id, accept, li) {
     if (accept) { loadRoster(); loadStats(); }
   });
 }
+
+/* ---- adding people: collapsed behind a button ---- */
+function setAddPeopleOpen(open) {
+  authEl("addPeopleBody").hidden = !open;
+  authEl("addPeopleToggle").setAttribute("aria-expanded", String(open));
+  authEl("addPeopleToggle").hidden = open;
+  if (open) authEl("userSearchInput").focus();
+}
+authEl("addPeopleToggle").addEventListener("click", function () { setAddPeopleOpen(true); });
 
 /* ---- adding people: in-app invites ---- */
 var userSearchInput = authEl("userSearchInput");
@@ -740,6 +779,7 @@ authEl("accountLogout").addEventListener("click", function () {
 /* ---------------- called by auth.js when login or team changes ---------------- */
 function onAccountChanged() {
   updateProfileButton();
+  refreshJoinRequestCount();
   refreshInbox();
   loadMySets();
   loadTeamPlans();

@@ -119,10 +119,22 @@ function showLoggedIn(user) {
   if (typeof onAccountChanged === "function") onAccountChanged();
 }
 
+// Pending join requests, for coaches/admins; shown as a count on the team badge.
+var pendingJoinCount = 0;
+
 function updateTeamBadge() {
   var badge = authEl("teamBadge");
   if (!badge) return;
   badge.textContent = currentTeam ? currentTeam.teamName : "No team assigned";
+  if (currentTeam && pendingJoinCount) {
+    var count = document.createElement("span");
+    count.className = "count-badge";
+    count.textContent = pendingJoinCount;
+    badge.appendChild(count);
+    badge.setAttribute("aria-label", currentTeam.teamName + " (" + pendingJoinCount + " join request" + (pendingJoinCount === 1 ? "" : "s") + ")");
+  } else {
+    badge.removeAttribute("aria-label");
+  }
 }
 
 // Right after logging in, the database can briefly reject the brand-new login

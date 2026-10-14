@@ -575,6 +575,13 @@
     <!-- In a team -->
     <div id="teamMain" class="team-stack" hidden>
 
+      <!-- Only shown to coaches/admins while someone is waiting. -->
+      <div class="team-card" id="joinRequestsCard" hidden>
+        <h3>Join requests <span class="count-badge" id="joinRequestCount"></span></h3>
+        <p class="chart-caption">People asking to join. Accept to add them as athletes.</p>
+        <ul class="people-list" id="joinRequestList"></ul>
+      </div>
+
       <div class="team-stats" id="teamStats"></div>
 
       <div class="team-grid">
@@ -609,14 +616,12 @@
         <p class="log-note" id="progressStatus"></p>
       </section>
 
-      <div class="team-card" id="joinRequestsCard" hidden>
-        <h3>Join requests</h3>
-        <p class="chart-caption">People asking to join. Accept to add them as athletes.</p>
-        <ul class="people-list" id="joinRequestList"></ul>
-      </div>
-
       <div class="team-card" id="addPeopleCard">
-        <h3 id="addPeopleTitle">Add athlete</h3>
+        <div class="team-card-head">
+          <h3 id="addPeopleTitle">Add athlete</h3>
+          <button type="button" class="btn-ghost" id="addPeopleToggle" aria-expanded="false" aria-controls="addPeopleBody">+ Add people</button>
+        </div>
+        <div id="addPeopleBody" hidden>
         <p class="chart-caption" id="addPeopleHint"></p>
         <div class="log-row" style="margin-top:12px;">
           <input type="search" id="userSearchInput" placeholder="Their name or exact email" autocomplete="off" aria-label="Search people">
@@ -641,6 +646,7 @@
           </div>
           <p class="log-note" id="inviteStatus"></p>
         </div>
+        </div><!-- /addPeopleBody -->
       </div>
 
     </div>
