@@ -668,6 +668,18 @@
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .readiness-flag { color: #F08A84; } }
   :root[data-theme="dark"] .readiness-flag { color: #F08A84; }
   .activity-time { margin-left: auto; white-space: nowrap; }
+
+  /* ---- Today's session ---- */
+  #todayCard .eyebrow { margin: 0; }
+  .today-workout { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .today-workout:first-child { border-top: none; padding-top: 0; }
+  .today-workout-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .today-items { margin: 10px 0 0; padding-left: 18px; font-size: 0.9rem; line-height: 1.7; }
+  .today-open { margin-top: 12px; }
+  .today-status { margin-left: auto; font-size: 0.78rem; font-weight: 600; white-space: nowrap; padding: 2px 8px; border-radius: 3px; }
+  .today-done { color: #1F8A4C; background: color-mix(in srgb, #1F8A4C 12%, transparent); }
+  .today-started { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .today-todo { color: var(--muted); background: color-mix(in srgb, var(--muted) 12%, transparent); }
   .person-avatar {
     flex: none;
     display: inline-flex;

@@ -110,6 +110,7 @@ function renderTeamPage() {
   var staff = isTeamStaff();
   if (!staff) authEl("joinRequestsCard").hidden = true;
   authEl("activityCard").hidden = true;
+  authEl("todayCard").hidden = true;
   setAddPeopleOpen(false);
   authEl("addPeopleTitle").textContent = staff ? "Add people" : "Suggest someone";
   authEl("addPeopleToggle").textContent = staff ? "+ Add people" : "+ Suggest someone";
@@ -236,6 +237,7 @@ function loadRoster() {
     renderRosterLists();
     renderStatTiles();
     loadActivity();
+    loadToday();
   });
 }
 
@@ -459,7 +461,7 @@ function renderActivityFeed(events) {
   var groups = [];
   var byKey = {};
   events.forEach(function (e) {
-    var key = e.user_id + "|" + e.exercise.toLowerCase() + "|" + localDayString(e.time);
+    var key = e.user_id + "|" + (e.exercise || "").toLowerCase() + "|" + localDayString(e.time);
     if (!byKey[key]) { byKey[key] = { first: e, sets: [] }; groups.push(byKey[key]); }
     byKey[key].sets.push(e);
   });
@@ -473,7 +475,7 @@ function renderActivityFeed(events) {
     var text = el("span", "person-text");
     var top = el("span", "person-line");
     top.appendChild(el("span", "person-name", who + (isMe ? " (you)" : "")));
-    top.appendChild(el("span", "person-meta", g.first.exercise));
+    top.appendChild(el("span", "person-meta", g.first.exercise || "Exercise"));
     text.appendChild(top);
     text.appendChild(el("span", "person-meta", setGroupSummary(g.sets)));
     li.appendChild(text);
@@ -492,6 +494,151 @@ function setGroupSummary(sets) {
   var speeds = sets.map(function (s) { return s.speed; }).filter(function (v) { return v !== null && v !== undefined; });
   if (speeds.length) parts.push("best set avg " + Math.max.apply(null, speeds).toFixed(2) + " m/s");
   return parts.join(" \u00b7 ");
+}
+
+/* ---- Today's session ----
+   Planned workouts are stored one per day (workouts.scheduled_date). The
+   database's rules let athletes read only their own and coaches/admins
+   their athletes', so an athlete only ever sees their own day. */
+function loadToday() {
+  if (!currentTeam || !currentUser) return;
+  var teamId = currentTeam.team_id;
+  var staff = isTeamStaff();
+  var ids = staff ? lastRoster.map(function (m) { return m.user_id; }) : [currentUser.id];
+  var today = todayString();
+  var midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  var queries = [
+    sb.from("workouts").select(WORKOUT_FIELDS + ", plan_assignments(id, plans(id, name, content))")
+      .in("athlete_id", ids).eq("scheduled_date", today),
+    sb.from("set_logs").select("athlete_id, workout_id, done_at").in("athlete_id", ids).gte("done_at", midnight.toISOString())
+  ];
+  // Athletes with nothing today also get their next planned day.
+  if (!staff) {
+    queries.push(sb.from("workouts").select(WORKOUT_FIELDS + ", plan_assignments(id, plans(id, name, content))")
+      .eq("athlete_id", currentUser.id).gt("scheduled_date", today).order("scheduled_date", { ascending: true }).limit(1));
+  }
+  Promise.all(queries).then(function (results) {
+    if (!currentTeam || currentTeam.team_id !== teamId) return;
+    // Training isn't set up (or failed to load): leave the card out.
+    if (results[0].error) { authEl("todayCard").hidden = true; return; }
+    var workouts = results[0].data || [];
+    var logsToday = results[1].error ? [] : (results[1].data || []);
+    var next = results[2] && !results[2].error ? (results[2].data || [])[0] : null;
+    authEl("todayCard").hidden = false;
+    if (staff) renderTodayCoach(workouts, logsToday);
+    else renderTodayAthlete(workouts, logsToday, next);
+  });
+}
+
+// done · started · not started
+function todayStatus(w, logsToday) {
+  if (w.completed_at) return "done";
+  if (w.started_at || logsToday.some(function (l) { return l.workout_id === w.id; })) return "started";
+  return "todo";
+}
+var TODAY_STATUS = { done: "\u2713 Done", started: "In progress", todo: "Not started" };
+
+// "Back squat 5×3 · Power"
+function planItemText(item) {
+  var scheme = item.sets && item.repsText ? item.sets + "\u00d7" + item.repsText : (item.repsText || (item.sets ? item.sets + " sets" : ""));
+  var text = item.name + (scheme ? " " + scheme : "");
+  return item.zone ? text + " \u00b7 " + item.zone : text;
+}
+
+function renderTodayAthlete(workouts, logsToday, next) {
+  var body = authEl("todayBody");
+  body.innerHTML = "";
+  authEl("todayEyebrow").textContent = "Today \u00b7 " + new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+  authEl("todayTitle").textContent = "Your session today";
+  if (!workouts.length) {
+    authEl("todaySummary").textContent = "No session planned today. Rest, or log a free workout in Training.";
+    if (next) {
+      var day = new Date(next.scheduled_date + "T00:00:00");
+      body.appendChild(el("p", "log-note", "Next: " + workoutTitle(next) + " on " +
+        day.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" })));
+    }
+    body.appendChild(button("Open Training", "btn-ghost today-open", function () { openMyWorkout(null); }));
+    return;
+  }
+  authEl("todaySummary").textContent = "";
+  workouts.forEach(function (w) {
+    var block = el("div", "today-workout");
+    var head = el("p", "today-workout-head");
+    head.appendChild(el("span", "person-name", workoutTitle(w)));
+    var status = todayStatus(w, logsToday);
+    head.appendChild(el("span", "today-status today-" + status, TODAY_STATUS[status]));
+    block.appendChild(head);
+    var plan = workoutPlan(w);
+    if (plan) block.appendChild(el("p", "person-meta", plan.name));
+    var dayPlan = workoutDay(w);
+    var items = dayPlan ? dayPlan.items || [] : [];
+    if (items.length) {
+      var list = el("ul", "today-items");
+      items.forEach(function (it) { list.appendChild(el("li", "", planItemText(it))); });
+      block.appendChild(list);
+    }
+    block.appendChild(button(status === "done" ? "See in Training" : status === "started" ? "Continue" : "Start in Training",
+                             status === "done" ? "btn-ghost today-open" : "btn today-open", function () { openMyWorkout(w.id); }));
+    body.appendChild(block);
+  });
+}
+
+function renderTodayCoach(workouts, logsToday) {
+  var body = authEl("todayBody");
+  body.innerHTML = "";
+  authEl("todayEyebrow").textContent = "Today \u00b7 " + new Date().toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+  authEl("todayTitle").textContent = "Today's sessions";
+
+  var trainedToday = {};
+  logsToday.forEach(function (l) { trainedToday[l.athlete_id] = true; });
+  var planned = workouts.map(function (w) { return { w: w, status: todayStatus(w, logsToday) }; });
+  var plannedIds = {};
+  planned.forEach(function (p) { plannedIds[p.w.athlete_id] = true; });
+  var free = Object.keys(trainedToday).filter(function (id) { return !plannedIds[id]; });
+
+  var people = Object.keys(plannedIds).length;
+  var done = planned.filter(function (p) { return p.status === "done"; }).length;
+  authEl("todaySummary").textContent = people
+    ? people + " " + (people === 1 ? "person has" : "people have") + " a session planned \u00b7 " + done + " done" +
+      (free.length ? " \u00b7 " + free.length + " trained without a plan" : "")
+    : "Nobody on the team has a session planned today." + (free.length ? " " + free.length + " trained without a plan." : "");
+
+  // Not started first (who still needs to train), then in progress, then done.
+  var order = { todo: 0, started: 1, done: 2 };
+  planned.sort(function (a, b) { return order[a.status] - order[b.status]; });
+  var list = el("ul", "people-list");
+  function row(userId, title, status, statusText) {
+    var member = lastRoster.filter(function (m) { return m.user_id === userId; })[0];
+    if (!member) return;
+    var isMe = currentUser && userId === currentUser.id;
+    var li = el("li", "person-row");
+    var b = el("button", "person-open");
+    b.type = "button";
+    b.appendChild(avatar(member.full_name, isMe));
+    var text = el("span", "person-text");
+    var top = el("span", "person-line");
+    top.appendChild(el("span", "person-name", member.full_name + (isMe ? " (you)" : "")));
+    top.appendChild(el("span", "person-meta", title));
+    text.appendChild(top);
+    b.appendChild(text);
+    b.appendChild(el("span", "today-status today-" + status, statusText));
+    b.setAttribute("aria-label", "Open " + member.full_name + "'s training");
+    b.addEventListener("click", function () { isMe ? openMyWorkout(null) : openAthleteTraining(member); });
+    li.appendChild(b);
+    list.appendChild(li);
+  }
+  planned.forEach(function (p) { row(p.w.athlete_id, workoutTitle(p.w), p.status, TODAY_STATUS[p.status]); });
+  free.forEach(function (id) { row(id, "Free workout", "done", "Trained"); });
+  if (list.children.length) body.appendChild(list);
+}
+
+// Open your own training on a given workout (or today's default).
+function openMyWorkout(workoutId) {
+  training.athleteId = null;
+  training.selectedId = workoutId;
+  training.tab = "training";
+  showPlans();
+  window.scrollTo(0, 0);
 }
 
 /* ---- stats ---- */
