@@ -161,10 +161,24 @@ function showZoneContent(label) {
   var idx = ex.zones.findIndex(function (z) { return z.label === label; });
   if (idx < 0) idx = 0;
   var info = ZONE_INFO[ex.zones[idx].label];
-  document.getElementById("zoneModalRange").textContent = ex.name + " · " + zoneRangeLabel(ex, idx);
+  document.getElementById("zoneModalRange").textContent = ex.name + " · " + zoneRangeLabel(ex, idx) + " · " + info.pct;
   document.getElementById("zoneModalTitle").textContent = ex.zones[idx].label;
   document.getElementById("zoneModalDesc").textContent = info.desc;
   document.getElementById("zoneModalBenefit").textContent = info.benefit;
+  var note = document.getElementById("zoneModalNote");
+  note.textContent = info.note || "";
+  note.hidden = !info.note;
+  var parts = document.getElementById("zoneModalParts");
+  parts.innerHTML = "";
+  info.parts.forEach(function (p) {
+    var tr = document.createElement("tr");
+    [p.name, p.pct, p.speed].forEach(function (text) {
+      var td = document.createElement("td");
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    parts.appendChild(tr);
+  });
   document.querySelectorAll(".zone-tab").forEach(function (b) {
     b.setAttribute("aria-selected", b.textContent === ex.zones[idx].label ? "true" : "false");
   });

@@ -110,12 +110,12 @@
       <div class="zones-wrap">
         <table class="zones">
           <thead>
-            <tr><th>Zone</th><th>Mean velocity</th><th>Training effect</th></tr>
+            <tr><th>Zone</th><th>Mean velocity</th><th>% of 1RM</th><th>Training effect</th></tr>
           </thead>
           <tbody>
-            <tr><td><span class="swatch" style="background:var(--zone-1)"></span>Explosivity</td><td class="range">&gt; 1.30 m/s</td><td>Explosive speed work at light loads</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone-2)"></span>Traditional</td><td class="range">0.50 – 1.30 m/s</td><td>Moderate loads, strength and muscle</td></tr>
-            <tr><td><span class="swatch" style="background:var(--zone-3)"></span>Maximal Strength</td><td class="range">&lt; 0.50 m/s</td><td>Heavy triples, doubles and near-1RM singles</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-1)"></span>Starting Strength / Speed</td><td class="range">&gt; 1.30 m/s</td><td class="range">0–30%</td><td>Explosive speed work at very light loads</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-2)"></span>Power</td><td class="range">0.50 – 1.30 m/s</td><td class="range">30–80%</td><td>Moving heavy weight fast; most training volume</td></tr>
+            <tr><td><span class="swatch" style="background:var(--zone-3)"></span>Absolute Strength</td><td class="range">&lt; 0.50 m/s</td><td class="range">80–100%</td><td>Heavy triples, doubles and near-1RM singles</td></tr>
           </tbody>
         </table>
       </div>
@@ -663,6 +663,11 @@
         <h3 id="zoneModalTitle"></h3>
         <p id="zoneModalDesc"></p>
         <p class="zone-modal-benefit"><strong>Why it matters: </strong><span id="zoneModalBenefit"></span></p>
+        <p class="zone-modal-note" id="zoneModalNote" hidden></p>
+        <table class="zone-parts">
+          <thead><tr><th>Zone</th><th>% of 1RM</th><th>Bar speed</th></tr></thead>
+          <tbody id="zoneModalParts"></tbody>
+        </table>
       </div>
     </div>
   </div>

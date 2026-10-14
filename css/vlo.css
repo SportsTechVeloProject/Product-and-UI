@@ -1003,6 +1003,12 @@
   .zone-modal-body p { font-size: 0.94rem; color: var(--fg); margin-top: 12px; line-height: 1.6; }
   .zone-modal-body .zone-modal-benefit { color: var(--muted); }
   .zone-modal-body .zone-modal-benefit strong { color: var(--fg); }
+  .zone-modal-body .zone-modal-note[hidden] { display: none; }
+  .zone-parts { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.86rem; }
+  .zone-parts th, .zone-parts td { text-align: left; padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border); }
+  .zone-parts th { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  .zone-parts td:not(:first-child) { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .zone-parts tr:last-child td { border-bottom: none; }
 
   .history h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; margin-bottom: 14px; }
   .history-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }

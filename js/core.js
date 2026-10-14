@@ -6,9 +6,9 @@
 // Speed zones, fastest first, by a set's mean bar speed. The same limits for
 // every lift for now; give a lift its own list in EXERCISES if that changes.
 var SPEED_ZONES = [
-  { min: 1.30, label: "Explosivity" },
-  { min: 0.50, label: "Traditional" },
-  { min: 0,    label: "Maximal Strength" }
+  { min: 1.30, label: "Starting Strength / Speed" },
+  { min: 0.50, label: "Power" },
+  { min: 0,    label: "Absolute Strength" }
 ];
 
 // Fictional lifter, fictional load-velocity profile per lift.
@@ -70,18 +70,36 @@ var EXERCISES = {
   }
 };
 
+// What each zone means. pct = rough share of 1RM. parts = the classic
+// velocity zones a zone is made of (shown in the zone popup), from the
+// widely used VBT zone chart (e.g. GymAware's velocity zones).
 var ZONE_INFO = {
-  "Explosivity": {
-    desc: "Light loads, roughly under 40% of 1RM, moved as fast as possible: speed work, jumps and explosive reps.",
-    benefit: "Trains the nervous system to produce force quickly. Builds explosiveness and bar acceleration, but does little on its own to raise your 1RM."
+  "Starting Strength / Speed": {
+    pct: "0–30% of 1RM",
+    desc: "Very light loads, or none, moved as fast as you possibly can: speed work, jumps and throws.",
+    benefit: "Trains the nervous system to get force going quickly from a standstill. Builds explosiveness and bar acceleration, but does little on its own to raise your 1RM.",
+    parts: [
+      { name: "Starting strength", pct: "0–30%", speed: "> 1.30 m/s" }
+    ]
   },
-  "Traditional": {
-    desc: "Light-to-moderately heavy loads, roughly 40–80% of 1RM, still lifted with intent to move fast.",
-    benefit: "Where most of a training block's volume lives. Builds strength and muscle and the ability to move heavy weight quickly."
+  "Power": {
+    pct: "30–80% of 1RM",
+    desc: "Light-to-heavy loads lifted with intent to move fast. Most of a training block's volume lives here.",
+    benefit: "Builds strength, muscle and the ability to move heavy weight quickly: the bridge between speed and maximal strength.",
+    note: "Power combines the three classic zones between 0.50 and 1.30 m/s into one:",
+    parts: [
+      { name: "Speed–strength", pct: "30–50%", speed: "1.30–1.00 m/s" },
+      { name: "Strength–speed", pct: "50–70%", speed: "1.00–0.75 m/s" },
+      { name: "Accelerative strength", pct: "70–80%", speed: "0.75–0.50 m/s" }
+    ]
   },
-  "Maximal Strength": {
-    desc: "Heavy loads, roughly 80% of 1RM and up: triples, doubles and near-maximal singles. The bar slows down, but the intent to accelerate stays.",
-    benefit: "Builds maximal strength and grooves technique under competition-like loads. Essential for peaking, but taxing on the nervous system, so use it with care."
+  "Absolute Strength": {
+    pct: "80–100% of 1RM",
+    desc: "Heavy loads: triples, doubles and near-maximal singles. The bar slows down, but the intent to accelerate stays.",
+    benefit: "Builds maximal strength and grooves technique under competition-like loads. Essential for peaking, but taxing on the nervous system, so use it with care.",
+    parts: [
+      { name: "Absolute strength", pct: "80–100%", speed: "< 0.50 m/s" }
+    ]
   }
 };
 

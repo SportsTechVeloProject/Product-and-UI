@@ -137,23 +137,24 @@ function parseExerciseLine(raw) {
   });
 
   // 3b. training zone the coach wants the sets in — velocity-based planning:
-  // "Back squat 5x3 traditional", "zone: explosivity", "@maximal strength".
-  // Single words (explosive, traditional, and the short fast/medium/slow)
-  // only count when marked with "zone:"/"@", followed by "zone", or last on
-  // the line, so "Traditional deadlift" or "3x5 slow eccentric" aren't read
-  // as zones. The old four zone names from earlier plans still read: the two
-  // faster ones are Traditional now, the two heavy ones Maximal Strength.
+  // "Back squat 5x3 power", "zone: absolute strength", "@starting strength".
+  // Multi-word names count anywhere on the line. Single words (power,
+  // speed, absolute, and older/short names) only count when marked with
+  // "zone:"/"@", followed by "zone", or last on the line, so "Power clean
+  // 3x3" or "3x5 slow eccentric" aren't read as zones. Older zone names
+  // from earlier plans still read.
   function zoneName(word) {
-    var z = fold(word);
-    return /^(fast|explosiv)/.test(z) ? "Explosivity"
-      : /^(slow|accel|max)/.test(z) ? "Maximal Strength" : "Traditional";
+    var z = fold(word).replace(/[^a-z]+/g, " ").trim();
+    if (z === "speed" || /^(starting|fast|explosiv)/.test(z)) return "Starting Strength / Speed";
+    if (/^(absolute|slow|max)/.test(z)) return "Absolute Strength";
+    return "Power"; // power, medium, traditional, speed-strength, strength-speed, accelerative
   }
-  var ZONE_WORD = "(explosiv(?:e|ity)|traditional|fast|medium|slow)";
-  var gotZone = take(new RegExp("(?:^|\\s)(?:zone\\s*:?\\s*|@\\s*)" + ZONE_WORD + "(?=[\\s,;]|$)|(?:^|\\s)" + ZONE_WORD + "(?:\\s+zone\\b|(?=\\s*[,;]?\\s*$))", "i"), function (m) {
-    item.zone = zoneName(m[1] || m[2]);
-  });
-  if (!gotZone) take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
+  var gotZone = take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(starting\s+strength(?:\s*\/\s*speed)?|absolute\s+strength|speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
     item.zone = zoneName(m[1]);
+  });
+  var ZONE_WORD = "(power|speed|absolute|explosiv(?:e|ity)|traditional|fast|medium|slow)";
+  if (!gotZone) take(new RegExp("(?:^|\\s)(?:zone\\s*:?\\s*|@\\s*)" + ZONE_WORD + "(?=[\\s,;]|$)|(?:^|\\s)" + ZONE_WORD + "(?:\\s+zone\\b|(?=\\s*[,;]?\\s*$))", "i"), function (m) {
+    item.zone = zoneName(m[1] || m[2]);
   });
 
   // 4. load — percentage and RPE before any bare "@140", which is kilos
@@ -1195,10 +1196,10 @@ function helpSheet() {
     [],
     [H("What bar speed means")],
     [K("Bar speed"), K("Zone"), K("What it trains")],
-    [L("above 1.30 m/s"), W("Explosivity"), W("Explosive speed work at light loads. Carries over to explosiveness.")],
-    [L("0.50 – 1.30 m/s"), W("Traditional"), W("Most of a training block's volume lives here.")],
-    [L("below 0.50 m/s"), W("Maximal Strength"), W("Heavy triples, doubles and near-maximal singles. Peaking work.")],
-    [M("Write the zone after the exercise, e.g. Back squat 5x3 traditional. The same limits apply to every lift.")],
+    [L("above 1.30 m/s"), W("Starting Strength / Speed"), W("0–30% of 1RM. Explosive speed work at very light loads.")],
+    [L("0.50 – 1.30 m/s"), W("Power"), W("30–80% of 1RM. Most of a training block's volume lives here.")],
+    [L("below 0.50 m/s"), W("Absolute Strength"), W("80–100% of 1RM. Heavy triples, doubles and near-maximal singles.")],
+    [M("Write the zone after the exercise, e.g. Back squat 5x3 power. The same limits apply to every lift.")],
     [],
     [H("You don't have to use this layout")],
     [W("V-Lo also reads weeks across the top with exercises down the side, one sheet per week, a Word table, a CSV, or a plain text list. Anything it can't read is listed back to you rather than dropped silently.")]
@@ -1413,13 +1414,13 @@ function renderPlanItem(item) {
 
 // What a block of each type should mostly consist of, by velocity zone.
 var BLOCK_EXPECTATION = {
-  hypertrophy: ["Traditional"],
-  strength: ["Maximal Strength", "Traditional"],
-  peaking: ["Maximal Strength"],
-  power: ["Explosivity", "Traditional"],
-  speed: ["Explosivity", "Traditional"],
-  "off season": ["Traditional"],
-  "in season": ["Explosivity", "Traditional"]
+  hypertrophy: ["Power"],
+  strength: ["Absolute Strength", "Power"],
+  peaking: ["Absolute Strength"],
+  power: ["Starting Strength / Speed", "Power"],
+  speed: ["Starting Strength / Speed", "Power"],
+  "off season": ["Power"],
+  "in season": ["Starting Strength / Speed", "Power"]
 };
 
 var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
