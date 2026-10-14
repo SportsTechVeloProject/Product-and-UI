@@ -423,12 +423,14 @@ function renderStatTiles() {
 
   var speed = el("div", "stat-tile stat-tile-wide");
   speed.appendChild(el("p", "stat-label", "Average bar speed per lift"));
-  var withSpeed = lastStats.filter(function (r) { return r.avg_mean_velocity !== null; });
-  if (!withSpeed.length) speed.appendChild(el("p", "stat-sub", "No rep data yet."));
-  withSpeed.forEach(function (r) {
+  // Only the three competition lifts, always in this order. Variations (pause
+  // squat, sumo...) move at different speeds and test recordings aren't
+  // training, so they're left out.
+  ["back_squat", "bench_press", "deadlift"].forEach(function (key) {
+    var r = lastStats.filter(function (x) { return x.exercise === key && x.avg_mean_velocity !== null; })[0];
     var row = el("p", "stat-row");
-    row.appendChild(el("span", "", exerciseName(r.exercise)));
-    row.appendChild(el("span", "mono", Number(r.avg_mean_velocity).toFixed(2) + " m/s"));
+    row.appendChild(el("span", "", exerciseName(key)));
+    row.appendChild(el("span", r ? "mono" : "stat-sub", r ? Number(r.avg_mean_velocity).toFixed(2) + " m/s" : "no data yet"));
     speed.appendChild(row);
   });
   box.appendChild(speed);
