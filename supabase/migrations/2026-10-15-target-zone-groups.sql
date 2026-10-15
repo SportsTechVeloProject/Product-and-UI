@@ -1,5 +1,5 @@
 -- Recordings' target zone: accept the code groups fast / medium / slow.
--- NOT APPLIED YET — waiting for review.
+-- Applied 2026-10-15 (22 recordings converted to medium; checked: fast/medium/slow accepted, other values refused).
 --
 -- Plain language: each recording remembers which speed zone the coach asked
 -- for (sessions.target_zone); the analysis uses it as Squats2's TYPE. Since
