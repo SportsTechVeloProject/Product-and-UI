@@ -9,6 +9,7 @@ website: ■ Stop & save
   → raw JSON to Storage (raw-sessions) + a row in sessions
   → Supabase Database Webhook (INSERT on sessions)
   → Azure Function new_session (HTTP): puts the session id on a queue, answers at once
+  (warm_up: the website wakes the analysis when sensors connect, see below)
   → Azure Function process_session (queue): main.process_waiting → reps + analyzed_at
   → My training shows the speed and the next-set suggestion
 Retry: a pg_cron job in Supabase re-sends every minute any recording older than a minute with
@@ -125,6 +126,25 @@ If it doesn't:
   ```bash
   curl -X POST "https://<app name>.azurewebsites.net/api/new-session?code=<key>" -H "Content-Type: application/json" -d "{\"id\": \"<session id>\"}"
   ```
+
+## Warm-up (avoiding the cold start)
+
+When both real sensors connect, and again on **● Record**, the website calls
+`/api/warm-up` (no key; it only wakes the app and touches no data; at most
+once every 3 minutes per browser). The function puts a `warm-up` message on
+the queue, so the **analysis** instance starts and loads numpy, scipy and the
+data team's code while the athlete gets ready. (On Flex Consumption the queue
+function runs on its own instances: waking the HTTP functions alone wouldn't
+help.) By the time the set ends, the result should take a few seconds.
+
+Check it: Function app → Functions → `process_session` → Invocations shows
+`Warm-up: analysis loaded in … s` shortly after sensors connect.
+
+Azure puts idle instances back to sleep after some minutes, so a long wait
+between connecting and the first set can still mean a cold start. For a live
+demo, also set **Settings → Scale and concurrency → Always ready**:
+`function:process_session` = 1 for the demo week (billed every hour it's on;
+remove it afterwards), and connect the sensors a few minutes before presenting.
 
 ## Cost
 

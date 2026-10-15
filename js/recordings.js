@@ -3,14 +3,31 @@
 
    Same steps as store_session() in python/main.py: the raw samples go to the
    raw-sessions Storage bucket as <user id>/<session id>.json, then a sessions
-   row points at them. The processing watcher (python/main.py --watch) picks
-   the row up, writes its reps and sets analyzed_at, or analysis_error if the
-   set couldn't be analyzed. See docs/database.md. */
+   row points at them. The processing on Azure (python/function_app.py, started
+   by a Supabase webhook) picks the row up, writes its reps and sets
+   analyzed_at, or analysis_error if the set couldn't be analyzed. See
+   docs/database.md and docs/azure-processing.md. */
 "use strict";
 
 // The plan reader's lift keys -> sessions.exercise, which picks the analysis code.
 var LIFT_EXERCISE = { squat: "back_squat", bench: "bench_press", deadlift: "deadlift" };
 var PENDING_KEY = "vlo.pendingRecording.v1";
+
+// Wakes the processing on Azure while the athlete gets ready, so the first
+// set's result doesn't wait for a cold start. Called when real sensors
+// connect and on Record. Fire and forget: no key (it only wakes the app and
+// touches no data), no answer needed, never more than once in a few minutes.
+var WARM_UP_URL = "https://vloprocessingkth-gsgmc6h6b5dghsck.germanywestcentral-01.azurewebsites.net/api/warm-up";
+var WARM_UP_EVERY_MS = 3 * 60 * 1000;
+var lastWarmUp = 0;
+function warmUpProcessing() {
+  if (sensorsSimulated() || Date.now() - lastWarmUp < WARM_UP_EVERY_MS) return;
+  lastWarmUp = Date.now();
+  try {
+    fetch(WARM_UP_URL, { method: "POST", mode: "no-cors", keepalive: true }).catch(function () {});
+  } catch (e) { /* offline or blocked: the set is still processed, just after a cold start */ }
+}
+document.addEventListener("vlo:sensors", function () { if (sensorsReady()) warmUpProcessing(); });
 
 function newId() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
