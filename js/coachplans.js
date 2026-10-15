@@ -201,6 +201,8 @@ function saveTeamPlan() {
     var wasOpen = !!openPlanId;
     openPlanId = res.data.id;
     status.textContent = wasOpen ? "Saved changes to “" + name + "”." : "Saved “" + name + "” to your team. Press Assign to give it to an athlete.";
+    var noZone = countMissingZones(currentPlan);
+    if (noZone) status.textContent += " Note: " + noZone + " Movesense exercise" + (noZone === 1 ? " has" : "s have") + " no zone yet.";
     loadTeamPlans();
     updateSaveButton();
   });
@@ -345,6 +347,8 @@ function confirmAssign() {
         return;
       }
       assignDone = "Assigned to " + personName(athleteId) + ": " + rows.length + " workouts scheduled.";
+      var noZone = countMissingZones(plan.content);
+      if (noZone) assignDone += " " + noZone + " Movesense exercise" + (noZone === 1 ? " has" : "s have") + " no zone, so no weight suggestions there.";
       note.textContent = assignDone;
       loadTeamPlans();
     });

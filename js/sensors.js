@@ -271,7 +271,14 @@ var MSSim = (function () {
 // True when both sleeves are connected, which a recording needs (the analysis
 // compares left and right). Kept up to date by the sensor panel below.
 var sensorStatus = { left: "disconnected", right: "disconnected" };
-function sensorsReady() { return sensorStatus.left === "connected" && sensorStatus.right === "connected"; }
+// Testing with a single sensor: open the page with ?mirror=1. One connected
+// sensor then counts as ready, and the recorder copies its samples to the
+// other side (recorder.js). Never for real training data.
+var SENSOR_MIRROR = /[?&]mirror=1(&|$)/.test(location.search);
+function sensorsReady() {
+  if (SENSOR_MIRROR) return sensorStatus.left === "connected" || sensorStatus.right === "connected";
+  return sensorStatus.left === "connected" && sensorStatus.right === "connected";
+}
 // Simulated sensors are for trying the flow only: their recordings are never
 // uploaded or analyzed (training.js).
 function sensorsSimulated() { var t = document.getElementById("simToggle"); return !!(t && t.checked); }
@@ -377,8 +384,10 @@ function sensorsSimulated() { var t = document.getElementById("simToggle"); retu
     note.textContent = simulating
       ? "Simulated sensors: replaying a recorded set of 11 squats, to try connecting and recording. Simulated recordings are never saved or analyzed."
       : unsupportedNote;
+    if (SENSOR_MIRROR) note.textContent += (note.textContent ? " " : "") + MIRROR_NOTE;
   });
 
+  var MIRROR_NOTE = "Test mode (?mirror=1): connect one sensor; its samples are copied to the other side when a set is saved. Not for real training data.";
   var unsupportedNote = "";
   if (!navigator.bluetooth) {
     unsupportedNote = "This browser has no Web Bluetooth, so real sensors can't connect. " +
@@ -390,6 +399,7 @@ function sensorsSimulated() { var t = document.getElementById("simToggle"); retu
       "opening the file directly won't let the sensors connect.";
   }
   note.textContent = unsupportedNote;
+  if (SENSOR_MIRROR) note.textContent += (note.textContent ? " " : "") + MIRROR_NOTE;
 
   renderSummary();
 })();

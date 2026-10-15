@@ -20,7 +20,9 @@ function newId() {
   });
 }
 
-// rec: what Recorder.stop() returned. details: { exercise, weightKg, reps }.
+// rec: what Recorder.stop() returned. details: { exercise, weightKg, reps, targetZone }
+// (targetZone: the code group of the coach's zone, fast / medium / slow
+// (zoneGroup() in core.js), or null. It's the analysis's Squats2 TYPE.)
 // Resolves to the new session id.
 function uploadRecording(rec, details) {
   var sessionId = newId();
@@ -35,6 +37,7 @@ function uploadRecording(rec, details) {
         exercise: details.exercise,
         weight_kg: details.weightKg,
         reported_rep_count: details.reps,
+        target_zone: details.targetZone || null,
         recorded_at: new Date(rec.startedAt).toISOString(),
         raw_data_path: path
       });

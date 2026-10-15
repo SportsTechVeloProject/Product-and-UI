@@ -14,7 +14,7 @@ Three parts, all in this repo now:
 | **Processing** | `python/` | `main.py` turns a recorded set into reps (speed per rep) using the data team's `Squats.py` logic. |
 | **Database** | Supabase; `supabase/`, `docs/database.md` | People and teams, recordings (`sessions` + `reps`), plans and workouts. Diagram: `docs/database-diagram.svg`. |
 
-The data team's own code lives in `SportsTechVeloProject/Product-testing` (branch `data-team`); `python/squats.py` and the four helper files are copies of it.
+The data team's own code lives in `SportsTechVeloProject/Product-testing` (branch `main`). Their squat files are copied unchanged into `python/squat/` by `python/sync_data_team.py` (`squat/SOURCE.txt` says which commit); `python/squats.py` runs the same steps as their `Squats2.py` on recordings from the website. Squats2 needs the rep count, a speed type (slow/medium/fast, from the coach's zone; `medium` without one), a few seconds standing still at the start, and the bar being racked before Stop.
 
 ## What was done Oct 9–12
 
@@ -54,16 +54,11 @@ Goal: the athlete always knows which speed zone they're working in, and sees the
 - **Set row:** a **Speed** column showing the measured average velocity after processing, coloured in-zone (green) / outside (amber), and the next row's weight pre-filled with the suggestion and marked "suggested". Fold the long result/suggestion lines into the row; details stay in ⓘ.
 - **Open question for the user:** they wrote "speed strength (0.5–0.75)". In the site's zone table 0.50–0.75 m/s is **Strength–speed** and **Speed–strength** is > 0.75. Confirm the naming/ranges before building (zone limits live in `EXERCISES` in `js/core.js`).
 
-### 2. Automatic processing on Azure Functions (decided)
-- Get **Azure for Students** (KTH email, free credit, no card).
-- A Python Azure Function App with:
-  - an **HTTP trigger** that processes one session (reuse `process_waiting()` from `python/main.py`),
-  - a **timer trigger** every few minutes that runs the same "waiting" query as `watch()`, as a safety net.
-- In Supabase: **Database → Webhooks** → on `INSERT` into `sessions`, POST to the function URL (with a shared secret header).
-- App settings: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (secret), the webhook secret.
-- Check `imufusion`, `scipy`, `pandas` install on Linux (Azure) from `requirements.txt`.
-- Measure time from Stop to result (for the paper).
-- Meanwhile, show "Waiting to be processed: the processing service isn't running right now…" if a set isn't processed within ~1 minute.
+### 2. Automatic processing on Azure Functions (code written 2026-10-13)
+- Code: `python/function_app.py` (webhook → queue → analysis, plus an hourly sweep), `host.json`, `requirements.txt`.
+- Setup, deployment and testing: **[azure-processing.md](azure-processing.md)**. Still to do: create the app, deploy, add the Supabase webhook.
+- Then: measure time from Stop to result (for the paper), warm and after a cold start.
+- Maybe: show "Waiting to be processed…" if a set isn't processed within ~1 minute.
 
 ### 3. Real-sensor test
 Run a warm-up ramp (e.g. 3 reps at 3–4 weights) with real sensors through My training. That checks Bluetooth + gyro and gives a first real load–velocity line. Ideally with GymAware alongside.

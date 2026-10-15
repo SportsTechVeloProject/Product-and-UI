@@ -29,7 +29,7 @@ A logged set can point to the recording made during it. That link is where "the 
 
 | Table | One row per | Foreign keys | Why they're related |
 |---|---|---|---|
-| `sessions` | **recorded set** (one Start → Stop with the sensors) | `user_id` → the lifter | A recording belongs to the person who lifted, *not* to a team: history moves with the lifter if they change team, and someone with no team can still record. Coaches see it because the lifter is in their team. |
+| `sessions` | **recorded set** (one Start → Stop with the sensors) | `user_id` → the lifter | A recording belongs to the person who lifted, *not* to a team: history moves with the lifter if they change team, and someone with no team can still record. Coaches see it because the lifter is in their team. Optional `target_zone` (e.g. 'Strength–speed', with an en dash) is the coach's zone from the plan, for the analysis; null when the set wasn't planned with one ([migration](../supabase/migrations/2026-10-13-session-target-zone.sql)). |
 | `reps` | rep detected in a recording | `session_id` → `sessions` (delete the recording → its reps go too) | A rep only exists inside a recording. Written by `python/main.py`. |
 | Storage `raw-sessions` | raw sensor file | path stored in `sessions.raw_data_path` | The ~1 MB of samples is too big for a row, so it lives in Storage; the row points to it. Re-running the analysis reads it from there. |
 

@@ -1119,19 +1119,19 @@ function sheetXml(rows, widths, opts) {
     views + cols + "<sheetData>" + body + "</sheetData>" + filter + "</worksheet>";
 }
 
-var TEMPLATE_HEADERS = ["Week", "Day", "Exercise", "Sets", "Reps", "Load",
+var TEMPLATE_HEADERS = ["Week", "Day", "Exercise", "Sets", "Reps", "Zone", "Load",
                         "Target velocity", "Velocity loss", "Tempo", "Notes"];
 
-// Week, Day, Exercise, Sets, Reps, Load, Target velocity, Velocity loss, Tempo, Notes
+// Week, Day, Exercise, Sets, Reps, Zone, Load, Target velocity, Velocity loss, Tempo, Notes
 var TEMPLATE_EXAMPLES = [
-  [1, "Day 1", "Back Squat",  5, "3",    "140kg",  "",          "",  "31X1", "example — straight load and tempo"],
-  [1, "Day 1", "Bench Press", 4, "5",    "85%",    "",          20,  "",     "example — stops on velocity loss"],
-  [1, "Day 1", "Deadlift",    3, "2",    "",       "0.45-0.55", "",  "",     "example — load comes from the speed"],
-  [1, "Day 2", "Pause Squat", 3, "2",    "120kg",  "",          "",  "33X0", "example — three seconds in the hole"],
-  [1, "Day 2", "Barbell Row", 4, "8-10", "70kg",   "",          "",  "",     "example — rep range"],
-  [2, "Day 1", "Back Squat",  5, "3",    "145kg",  "",          15,  "31X1", "example"],
-  [2, "Day 1", "Bench Press", 4, "4",    "87.5kg", "",          "",  "",     "example"],
-  [2, "Day 2", "Deadlift",    3, "2",    "87.5%",  "",          "",  "",     "example"]
+  [1, "Day 1", "Back Squat",  5, "3",    "Strength-speed",        "",      "",          "",  "31X1", "example — the zone sets the speed; V-Lo suggests the weight"],
+  [1, "Day 1", "Bench Press", 4, "5",    "Accelerative strength", "",      "",          20,  "",     "example — stops on velocity loss"],
+  [1, "Day 1", "Deadlift",    3, "2",    "",                      "",      "0.45-0.55", "",  "",     "example — an exact speed range instead of a zone"],
+  [1, "Day 2", "Pause Squat", 3, "2",    "Accelerative strength", "",      "",          "",  "33X0", "example — three seconds in the hole"],
+  [1, "Day 2", "Barbell Row", 4, "8-10", "",                      "70kg",  "",          "",  "",     "example — not a Movesense lift: plain load"],
+  [2, "Day 1", "Back Squat",  5, "3",    "Accelerative strength", "",      "",          15,  "31X1", "example"],
+  [2, "Day 1", "Bench Press", 4, "4",    "Strength-speed",        "",      "",          "",  "",     "example"],
+  [2, "Day 2", "Deadlift",    3, "2",    "Absolute strength",     "",      "",          "",  "",     "example"]
 ];
 
 var BLANK_ROWS = 60;
@@ -1142,7 +1142,7 @@ function programmeSheet() {
 
   TEMPLATE_EXAMPLES.forEach(function (r) {
     rows.push(r.map(function (v, i) {
-      var numeric = (i === 0 || i === 3 || i === 7) && typeof v === "number";
+      var numeric = (i === 0 || i === 3 || i === 8) && typeof v === "number";
       return { v: v, s: S.example, n: numeric };
     }));
   });
@@ -1153,9 +1153,9 @@ function programmeSheet() {
     var style = i % 2 ? S.band : S.cell;
     rows.push(TEMPLATE_HEADERS.map(function () { return { v: "", s: style }; }));
   }
-  return sheetXml(rows, [7, 11, 28, 7, 11, 11, 15, 13, 9, 34], {
+  return sheetXml(rows, [7, 11, 28, 7, 11, 22, 11, 15, 13, 9, 40], {
     freeze: true,
-    autoFilter: "A1:J1",
+    autoFilter: "A1:K1",
     heights: [22]
   });
 }
@@ -1178,14 +1178,15 @@ function helpSheet() {
     [L("Exercise"), W("Free text. Squat, bench and deadlift are matched to the sensors automatically, including variants like Pause Squat."), W("Back Squat")],
     [L("Sets"), W("A number."), W("5")],
     [L("Reps"), W("A number, a range, or a descending ladder."), W("3   ·   8-10   ·   12-10-8-6")],
-    [L("Load"), W("Kilos, a percentage of the lifter's one-rep max, or an RPE."), W("140kg   ·   85%   ·   RPE8")],
+    [L("Zone"), W("The speed zone for squat, bench and deadlift. V-Lo suggests the weight that moves in this zone for that lifter."), W("Starting strength · Speed-strength · Strength-speed · Accelerative strength · Absolute strength")],
+    [L("Load"), W("Kilos, a percentage of the lifter's one-rep max, or an RPE. For Movesense lifts, prefer a Zone."), W("140kg   ·   85%   ·   RPE8")],
     [L("Target velocity"), W("Bar speed in metres per second. A single value or a range."), W("0.45-0.55")],
     [L("Velocity loss"), W("The percentage drop at which the set stops."), W("20")],
     [L("Tempo"), W("Four characters: lowering, pause at the bottom, lifting, pause at the top. X means explosive."), W("31X1 is three seconds down, one second held, explosive up, one second at the top.")],
     [L("Notes"), W("Anything else. It is shown to the lifter as written."), W("belt from set 3")],
     [],
     [H("Programming to velocity")],
-    [W("Target velocity and Velocity loss are the two columns that make this a velocity-based programme rather than a schedule.")],
+    [W("Zone, Target velocity and Velocity loss are the columns that make this a velocity-based programme rather than a schedule. Give every squat, bench and deadlift a Zone.")],
     [W("Set a Target velocity and leave Load empty. V-Lo works the kilos out from that lifter's own load–velocity profile, so the weight follows their form on the day instead of a number written weeks ago.")],
     [W("Fill in both and V-Lo checks them against each other, and warns you when a load will not produce the bar speed you asked for.")],
     [W("Velocity loss ends a set on what the bar actually did rather than on a rep count. Roughly 10–15% for strength and speed work, 20–25% for hypertrophy. The lifter stops when the drop is reached, however many reps that takes.")],
@@ -1315,6 +1316,71 @@ function el(tag, cls, text) {
   return n;
 }
 
+/* ---------------- zones in the plan builder ---------------- */
+// Every Movesense lift (squat, bench, deadlift and their variants) should carry
+// a speed zone, so the athlete knows what to aim for and gets weight
+// suggestions. The builder warns when one is missing and offers a picker that
+// writes the zone into the plan text.
+
+// Any zone already written on a line (so the picker can replace it): the
+// zone names anywhere, single words when marked ("zone: medium", "@power")
+// or last on the line. Same rules as the plan reader (parseExerciseLine).
+var ZONE_PATTERN = /(?:^|\s)(?:zone\s*:?\s*|@\s*)?(?:starting\s+strength(?:\s*\/\s*speed)?|absolute\s+strength|speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)|(?:^|\s)(?:zone\s*:?\s*|@\s*)(?:power|speed|absolute|accelerative|explosiv(?:e|ity)|traditional|fast|medium|slow)(?=[\s,;]|$)|\s(?:power|speed|absolute|accelerative|explosiv(?:e|ity)|traditional|fast|medium|slow)(?:\s+zone)?\s*$/i;
+// What the picker writes into the plan for a zone key: its name, e.g. "strength-speed".
+function zoneWord(key) { return zoneLabel(key).toLowerCase(); }
+
+// A Movesense lift with neither a zone nor an exact speed range.
+function missingZone(item) { return !!item.lift && !item.zone && !item.velocity; }
+
+function countMissingZones(plan) {
+  var n = 0;
+  (plan.weeks || []).forEach(function (w) { w.days.forEach(function (d) { d.items.forEach(function (it) { if (missingZone(it)) n++; }); }); });
+  return n;
+}
+
+// Writes `zone` into the plan line this item was read from (its _occ-th
+// occurrence), replacing any zone already there, then re-reads the plan.
+function setItemZone(item, zone) {
+  var textEl = document.getElementById("planText");
+  var lines = textEl.value.split("\n");
+  var seen = -1;
+  for (var i = 0; i < lines.length; i++) {
+    var body = lines[i].trim().replace(/^\s*[-*•]\s+/, "");
+    if (lines[i].trim() !== item.raw.trim() && body !== item.raw.trim()) continue;
+    if (++seen !== (item._occ || 0)) continue;
+    var line = lines[i].replace(ZONE_PATTERN, "").replace(/\s+$/, "");
+    var note = line.indexOf("//");
+    lines[i] = note === -1
+      ? line + " " + zoneWord(zone)
+      : line.slice(0, note).replace(/\s+$/, "") + " " + zoneWord(zone) + " " + line.slice(note);
+    break;
+  }
+  textEl.value = lines.join("\n");
+  runPlanParse(true);
+  var status = document.getElementById("planStatus");
+  if (typeof openPlanId !== "undefined" && openPlanId) {
+    status.textContent = "Zone set. Press “Save changes to team plan” to update it for your athletes.";
+  }
+}
+
+function zonePicker(item) {
+  var box = el("div", "zone-picker");
+  box.appendChild(el("span", "zone-picker-label", item.zone ? "Zone" : "Pick a zone"));
+  // The five zones (SPEED_ZONES in core.js); the plan stores the zone key.
+  SPEED_ZONES.forEach(function (z, i) {
+    var b = el("button", "zone-choice zone-" + (i + 1), z.label);
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(item.zone === z.key));
+    b.title = (function () {
+      var r = zoneRange(EXERCISES[item.lift.key], z.key);
+      return r ? "Average set speed " + r.lo.toFixed(2) + "–" + r.hi.toFixed(2) + " m/s" : z.label;
+    })();
+    b.addEventListener("click", function () { setItemZone(item, z.key); });
+    box.appendChild(b);
+  });
+  return box;
+}
+
 function renderPlanItem(item) {
   var wrap = el("div", "plan-item");
   var top = el("div", "plan-item-top");
@@ -1365,8 +1431,12 @@ function renderPlanItem(item) {
   if (item.zone) {
     var zr = item.lift ? zoneRange(EXERCISES[item.lift.key], item.zone) : null;
     wrap.appendChild(el("p", "plan-item-vbt", "Zone: " + zoneLabel(item.zone) +
-      (zr ? " · aim " + zr.lo.toFixed(2) + "–" + zr.hi.toFixed(2) + " m/s; the weight is suggested from the athlete's own sets" : "")));
+      (zr ? " · aim " + zr.lo.toFixed(2) + "–" + zr.hi.toFixed(2) + " m/s average; the weight is suggested from the athlete's own sets" : "")));
   }
+  if (missingZone(item)) {
+    wrap.appendChild(el("p", "plan-item-warn zone-missing", "⚠ No zone: the athlete gets no speed target or weight suggestions for this lift."));
+  }
+  if (item.lift) wrap.appendChild(zonePicker(item));
   if (item.velocityLoss != null) {
     wrap.appendChild(el("p", "plan-item-vbt",
       "Stop the set at " + item.velocityLoss + "% velocity loss"));
@@ -1485,6 +1555,7 @@ function renderPlan(plan) {
 
   var days = 0, items = 0, tracked = 0, tempos = 0;
   var zoneCounts = {};
+  var occurrences = {};
   plan.weeks.forEach(function (w) {
     var wrap = el("div", "plan-week");
     wrap.appendChild(el("p", "plan-week-head", w.label));
@@ -1498,6 +1569,7 @@ function renderPlan(plan) {
       card.appendChild(head);
       d.items.forEach(function (it) {
         items++;
+        it._occ = occurrences[it.raw] = (occurrences[it.raw] === undefined ? 0 : occurrences[it.raw] + 1);
         if (it.lift) tracked++;
         if (it.tempo) tempos++;
         var z = itemZone(it);
@@ -1517,6 +1589,8 @@ function renderPlan(plan) {
     tracked + " sensor-tracked"
   ];
   if (tempos) summary.push(tempos + " with tempo");
+  var noZone = countMissingZones(plan);
+  if (noZone) summary.push("⚠ " + noZone + " without a zone");
   document.getElementById("planSummary").textContent = summary.join(" · ");
   renderBlock(plan, zoneCounts);
 

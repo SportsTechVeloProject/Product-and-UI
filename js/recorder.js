@@ -47,6 +47,14 @@ var Recorder = (function () {
     var rec = active;
     active = null;
     var rows = [];
+    // Single-sensor test mode (sensors.js, ?mirror=1): copy the one sensor to the other side.
+    if (typeof SENSOR_MIRROR !== "undefined" && SENSOR_MIRROR) {
+      ["acc", "gyro"].forEach(function (kind) {
+        var l = rec[kind].left, r = rec[kind].right;
+        if (!l.length && r.length) rec[kind].left = r.map(function (s) { return Object.assign({}, s, { sensor: "left" }); });
+        if (!r.length && l.length) rec[kind].right = l.map(function (s) { return Object.assign({}, s, { sensor: "right" }); });
+      });
+    }
     ["left", "right"].forEach(function (side) {
       var acc = rec.acc[side].slice().sort(function (a, b) { return a.t - b.t; });
       var gyro = rec.gyro[side].slice().sort(function (a, b) { return a.t - b.t; });
