@@ -2,28 +2,42 @@
 
 *Written 2026-10-14 by greipur22 (with Claude), for whoever merges `main` into `greipur-dev`. Fold the relevant parts into `next-steps.md` during the merge. Each commit message also lists its changes in detail.*
 
-**State:** 21 commits on `greipur-dev`, all pushed. **Not merged with `main` yet.** `main` has 7 newer commits (vbt-zones, Squats2, Azure processing). See [Merging with main](#merging-with-main) before merging.
+**State:** all work is on `greipur-dev` (see the commit list on GitHub). **Not merged with `main` yet.** `main` has 7 newer commits (vbt-zones, Squats2, Azure processing). See [Merging with main](#merging-with-main) before merging.
 
 ---
 
-## 1. Speed zones: three zones, the same for every lift
+## 1. Speed zones: five literature zones on the website, three groups in the code
 
-The four old zones (speed-strength, strength-speed, accelerative, maximal) are replaced everywhere by three. **Code uses the data team's `Squats2` names, the website shows full names:**
+*(Final version, 2026-10-15. The zones were renamed several times on 2026-10-14; this is what's in the code now.)*
 
-| Key (code, database) | Shown on the website | Mean bar speed | % of 1RM | Combines the classic zones |
+**The website shows the five velocity zones from the VBT literature** (Bryan Mann, as published by GymAware: <https://gymaware.com/velocity_zones/>). **The code underneath has three groups**, the same words as the data team's `Squats2` TYPE: `fast` / `medium` / `slow`. Every zone belongs to exactly one group:
+
+| Zone key | Shown on the website | Mean bar speed | % of 1RM (GymAware article text) | Code group |
 |---|---|---|---|---|
-| `fast` | Starting Strength / Speed | > 1.30 m/s | 0–30% | starting strength |
-| `medium` | Power | 0.50–1.30 m/s | 30–80% | speed-strength, strength-speed, accelerative strength |
-| `slow` | Absolute Strength | < 0.50 m/s | 80–100% | absolute strength |
+| `starting_strength` | Starting strength | > 1.30 m/s | bodyweight / very light | `fast` |
+| `speed_strength` | Speed-strength | 1.00–1.30 m/s | about 20–40% | `medium` |
+| `strength_speed` | Strength-speed | 0.75–1.00 m/s | about 40–60% | `medium` |
+| `accelerative_strength` | Accelerative strength | 0.50–0.75 m/s | about 65–80% | `medium` |
+| `absolute_strength` | Absolute strength | < 0.50 m/s | about 80–100% | `slow` |
 
-- Limits are based on the GymAware velocity-zone chart. They're the same for squat, bench and deadlift (deadlift used to have lower limits).
-- **One place to change them:** `SPEED_ZONES` in `js/core.js` (`{ key, min, label }`, fastest first).
-- `zoneKey(name)` turns any zone name into its key: keys, labels, and all older names (Strength–speed, Maximal strength, Explosivity, Traditional, Power…). `zoneLabel(name)` gives the display name. `zoneFor()` returns the key; every place that displays a zone wraps it in `zoneLabel()`.
-- `ZONE_INFO` (descriptions, % of 1RM, and the classic zones each zone covers) and `BLOCK_EXPECTATION` are keyed by key.
-- **Zone popup** (click a zone in the app): range, % of 1RM, and a table of the classic zones it covers. Power explains that it combines the three zones between 0.50 and 1.30 m/s.
-- **Landing-page zone table:** the three zones with a "% of 1RM" column.
-- **Plan reader:** the coach can write `Back squat 5x3 power`, `zone: absolute strength`, `@starting strength`, or the keys `fast/medium/slow`. Single words count only when marked (`zone:` / `@`), followed by "zone", or last on the line, so "Power clean 3x3" and "3x5 slow eccentric" aren't read as zones. Saved as the key. Old names in saved plans still work (speed-strength, strength-speed and accelerative → `medium`, maximal → `slow`).
-- **Effect on weight suggestions (`js/vbt.js`):** Power is wide (0.50–1.30). A suggestion aims at the middle of the zone (~0.90 m/s) and "stays at this weight" anywhere inside it. Coaches who want tighter control can write an exact speed (`@0.6 m/s`).
+- The limits are the same for squat, bench and deadlift.
+- **The zone is always decided by the measured bar speed.** The % of 1RM is descriptive text only. The article's numbers were chosen over GymAware's chart image, which gives slightly different percentages.
+- **Code (`js/core.js`):**
+  - `SPEED_ZONES`: the five `{ key, min, label, group }`, fastest first.
+  - `SPEED_GROUPS`: the three groups and their limits.
+  - `zoneFor(ex, v)` returns the zone key.
+  - `zoneGroup(name)` returns fast/medium/slow. **Use this for the analysis and the database** (e.g. `sessions.target_zone`).
+  - `zoneLabel(name)` gives the display name.
+  - `zoneKey(name)` accepts any name: keys, labels, the group words, and every older name (Power, Traditional, Maximal strength, Explosivity…).
+  - `ZONE_INFO` holds the description and % per zone.
+- **Coaches target one of the five zones** in a plan (`Back squat 5x3 strength-speed`, `zone: accelerative`, `@absolute`), so weight suggestions aim at a narrow range (e.g. 0.75–1.00 m/s). Writing **`medium`** (or Power / Traditional) still works as a broad target for the whole 0.50–1.30 m/s, shown as "Speed-strength to accelerative strength". `fast`/`slow` map to starting/absolute strength.
+- Single words only count as zones when marked (`zone:` / `@`), followed by "zone", or last on the line, so "Power clean 3x3" and "3x5 slow eccentric" stay plain text.
+- **Shown in:**
+  - the zone popup: all five zones with speed and %, the current one highlighted
+  - the landing-page table
+  - rep chips, history, chart colours (`--zone-1` … `--zone-5`)
+  - the progress charts
+  - Top PRs: one row per zone
 
 ## 2. Team page
 
@@ -36,7 +50,7 @@ Top to bottom:
   - **Total lifted.**
   - **Lifted this week:** kg (weight × reps) since Monday, with an arrow: ↑ more than 5% ahead / ↓ more than 5% behind the average of earlier weeks, scaled to how far into the week it is. Earlier weeks are counted from the team's first active week (`PACE_MARGIN`).
   - **Average bar speed per lift:** back squat, bench press and deadlift only, "no data yet" until recorded.
-- **Top PRs:** per exercise and zone, the 3 heaviest sensor-recorded sets, **one per athlete** (their best), with picture, weight, average speed, date and time. Ties go to the faster set. Only analysed lifts, so test recordings are left out.
+- **Top PRs:** per exercise, one row per zone (all five), the 3 heaviest sensor-recorded sets, **one per athlete** (their best), with picture, weight, average speed, date and time. Ties go to the faster set. Only analysed lifts, so test recordings are left out.
 - **Coaches / Athletes lists:**
   - Each person has a round picture or initial.
   - **"Last trained … · N days this week"**: coaches/admins see it for everyone, athletes only for themselves.
@@ -52,7 +66,7 @@ Top to bottom:
 - **Edit team look** (coaches/admins): upload/remove the team picture and pick one of 8 team colours, each checked to have at least 3:1 contrast on the light and dark backgrounds. The colour tints the team name and the header badge.
 
 **Today's session**
-- **Athletes** see their plan for today: workout, plan, exercises like "Back squat 5×3 · Power", status Not started / In progress / ✓ Done, and a button that opens it in Training. With nothing planned it says so and shows the next planned day.
+- **Athletes** see their plan for today: workout, plan, exercises like "Back squat 5×3 · Strength-speed", status Not started / In progress / ✓ Done, and a button that opens it in Training. With nothing planned it says so and shows the next planned day.
 - **Coaches/admins** see everyone with a session today (not started first), plus anyone who trained without a plan.
 
 ## 3. Other website changes
@@ -87,7 +101,7 @@ Pictures are cropped square and shrunk in the browser before upload (256 px prof
 ## 6. Local development
 
 - **`python devserver.py`** serves the site on http://localhost:8080/vlo.html like `python -m http.server`, but with `Cache-Control: no-store`, so a normal reload always gets the newest JS/CSS. `.claude/launch.json` uses it.
-- Script and style links in `vlo.html` carry **`?v=N`** (now 13). Bump it when changing JS/CSS so browsers that cached an older copy download the files again.
+- Script and style links in `vlo.html` carry **`?v=N`** (now 14). Bump it when changing JS/CSS so browsers that cached an older copy download the files again.
 
 ## Merging with main
 
@@ -98,9 +112,9 @@ Checked with `git merge-tree` against `main` at `dc00a2c`:
    - `js/training.js` (~line 642, athlete card)
 
    Keep both: `zoneLabel(item.zone)` for the display name, plus main's wording and its "No speed zone set by your coach" branch.
-2. **Database:** `sessions_target_zone_check` (from main's `2026-10-13-session-target-zone.sql`) only allows the four old names, so recording a set with a zone from `greipur-dev` would be **rejected**. Change it to accept `'fast','medium','slow'` **and** the old names for now, so `main` keeps working. Convert the 5 existing `'Strength–speed'` rows to `'medium'`. Write it as a new migration file.
-3. **`python/squats.py`:** the zone is now the Squats2 TYPE directly. Pass `fast/medium/slow` through and keep mapping the old names for older recordings. **Redeploy the Azure function.** Until then, sets with the new keys are processed as `medium`.
-4. **Plan builder zone picker** (from main): show the three labels from `SPEED_ZONES`, save `zone.key`. Update the coach template's example rows and help text to the new names.
+2. **Database:** `sessions_target_zone_check` (from main's `2026-10-13-session-target-zone.sql`) only allows the four old names. Save the **group** there: `zoneGroup(item.zone)` gives `fast`/`medium`/`slow`. Change the check to accept `'fast','medium','slow'` **and** the old names for now, so `main` keeps working. Convert the 5 existing `'Strength–speed'` rows to `'medium'`. Write it as a new migration file.
+3. **`python/squats.py`:** the saved zone is now the Squats2 TYPE directly (`fast/medium/slow`). Pass it through and keep mapping the old names for older recordings. **Redeploy the Azure function.**
+4. **Plan builder zone picker** (from main): offer the five zones from `SPEED_ZONES` (show `label`, save `key`), plus "Medium (0.50–1.30)" if a broad target is wanted. Main's coach template example rows should use the five names.
 5. Bump `?v=` in `vlo.html`.
 
 ## Open items and ideas
@@ -115,7 +129,7 @@ Checked with `git merge-tree` against `main` at `dc00a2c`:
 
 | File | What changed |
 |---|---|
-| `js/core.js` | `SPEED_ZONES`, `zoneKey()`, `zoneLabel()`, `ZONE_INFO` |
+| `js/core.js` | `SPEED_ZONES` (5 zones), `SPEED_GROUPS` (3), `zoneKey()`, `zoneGroup()`, `zoneLabel()`, `ZONE_INFO` |
 | `js/team.js` | The team page: stats, Top PRs, roster status, readiness, activity feed, Today, progress charts, pictures, team look, roles, leave |
 | `js/auth.js` | Loads the profile picture and team picture/colour; team badge with count, colour, picture |
 | `js/plans.js` | Zone parsing, template text, block-type checks |

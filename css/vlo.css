@@ -18,8 +18,9 @@
     /* Training zones, fastest to slowest (front-page table, bar speed chart, rep chips) */
     --zone-1: #2247D6;
     --zone-2: #1F8A7E;
-    --zone-3: #B8860B;
-    --zone-4: #B5532A;
+    --zone-3: #4C8C2B;
+    --zone-4: #B8860B;
+    --zone-5: #B5532A;
     --warn: #C0392B;
   }
   @media (prefers-color-scheme: dark) {
@@ -41,8 +42,9 @@
       --good: #4CAF50;
       --zone-1: #6C8CFF;
       --zone-2: #4FC3B5;
-      --zone-3: #E8C158;
-      --zone-4: #EE8A62;
+      --zone-3: #8CC56B;
+      --zone-4: #E8C158;
+      --zone-5: #EE8A62;
       --warn: #FF7A6B;
     }
   }
@@ -64,8 +66,9 @@
     --good: #4CAF50;
     --zone-1: #6C8CFF;
     --zone-2: #4FC3B5;
-    --zone-3: #E8C158;
-    --zone-4: #EE8A62;
+    --zone-3: #8CC56B;
+    --zone-4: #E8C158;
+    --zone-5: #EE8A62;
     --warn: #FF7A6B;
   }
 
@@ -609,11 +612,17 @@
   /* ---- Top PRs ---- */
   .pr-exercise { margin-top: 18px; }
   .pr-exercise-name { font-size: 0.95rem; font-weight: 600; text-transform: none; font-family: 'IBM Plex Sans', sans-serif; }
-  .pr-zones { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-top: 8px; }
-  .pr-zone { border: 1px solid var(--border); border-radius: 4px; padding: 12px 14px; background: var(--bg); min-width: 0; }
+  /* One row per speed zone: the zone on the left, its top 3 side by side. */
+  .pr-zones { display: flex; flex-direction: column; margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); }
+  .pr-zone { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 4px 16px; align-items: center; padding: 10px 14px; border-top: 1px solid var(--border); min-width: 0; }
+  .pr-zone:first-child { border-top: none; }
+  .pr-zone .pr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 0 24px; margin: 0; }
+  .pr-who .person-meta { white-space: nowrap; }
+  .pr-zone .pr-row { border-top: none; padding: 4px 0; }
+  @media (max-width: 640px) { .pr-zone { grid-template-columns: 1fr; } }
   .pr-zone-name { display: flex; align-items: center; gap: 8px; font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
   .pr-zone-name .swatch { border-radius: 2px; margin-right: 0; flex: none; }
-  .pr-zone .log-note { margin-top: 10px; }
+  .pr-zone .log-note { margin: 0; }
   .pr-list { list-style: none; padding: 0; margin: 8px 0 0; }
   .pr-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); }
   .pr-row:first-child { border-top: none; }
@@ -1144,6 +1153,7 @@
   .zone-parts th { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
   .zone-parts td:not(:first-child) { font-family: 'IBM Plex Mono', monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .zone-parts tr:last-child td { border-bottom: none; }
+  .zone-parts tr.is-current td { color: var(--accent); font-weight: 600; }
 
   .history h3 { font-size: 1.05rem; text-transform: none; font-weight: 600; font-family: 'IBM Plex Sans', sans-serif; margin-bottom: 14px; }
   .history-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 4px; }
@@ -1269,7 +1279,7 @@
   .training-zone { font-size: 0.86rem; margin: 0; color: var(--good); font-weight: 500; }
   .training-suggest { font-size: 0.86rem; margin: 0; padding: 6px 10px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 8%, transparent); }
   .training-set-wrap .training-suggest { margin: 2px 0 6px 54px; }
-  .training-suggest.next-up, .training-suggest.next-down { background: color-mix(in srgb, var(--zone-3) 14%, transparent); }
+  .training-suggest.next-up, .training-suggest.next-down { background: color-mix(in srgb, var(--zone-4) 14%, transparent); }
   .training-suggest.next-hold { background: color-mix(in srgb, var(--good) 12%, transparent); }
   .training-suggest.next-stop { background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); }
   .training-sets { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }

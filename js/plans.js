@@ -137,17 +137,18 @@ function parseExerciseLine(raw) {
   });
 
   // 3b. training zone the coach wants the sets in — velocity-based planning:
-  // "Back squat 5x3 power", "zone: absolute strength", "@starting strength",
-  // or the keys: "zone: slow". Multi-word names count anywhere on the line.
-  // Single words (power, speed, absolute, fast/medium/slow, older names)
-  // only count when marked with "zone:"/"@", followed by "zone", or last on
-  // the line, so "Power clean 3x3" or "3x5 slow eccentric" aren't read as
-  // zones. Saved as the key (fast / medium / slow); see zoneKey in core.js.
+  // one of the five zones ("Back squat 5x3 strength-speed", "zone: absolute
+  // strength", "@accelerative"), or "medium" for anywhere in 0.50–1.30 m/s.
+  // Multi-word names count anywhere on the line. Single words (medium, fast,
+  // slow, power, absolute, accelerative, speed…) only count when marked with
+  // "zone:"/"@", followed by "zone", or last on the line, so "Power clean
+  // 3x3" or "3x5 slow eccentric" aren't read as zones. Saved as the zone key
+  // (or "medium"); see zoneKey / zoneGroup in core.js.
   var zoneName = zoneKey;
   var gotZone = take(/(?:^|\s)(?:zone\s*:?\s*|@\s*)?(starting\s+strength(?:\s*\/\s*speed)?|absolute\s+strength|speed[\s\-–]*strength|strength[\s\-–]*speed|accelerative(?:\s+strength)?|max(?:imal)?\s+strength)(?=[\s,;]|$)/i, function (m) {
     item.zone = zoneName(m[1]);
   });
-  var ZONE_WORD = "(power|speed|absolute|explosiv(?:e|ity)|traditional|fast|medium|slow)";
+  var ZONE_WORD = "(power|speed|absolute|accelerative|explosiv(?:e|ity)|traditional|fast|medium|slow)";
   if (!gotZone) take(new RegExp("(?:^|\\s)(?:zone\\s*:?\\s*|@\\s*)" + ZONE_WORD + "(?=[\\s,;]|$)|(?:^|\\s)" + ZONE_WORD + "(?:\\s+zone\\b|(?=\\s*[,;]?\\s*$))", "i"), function (m) {
     item.zone = zoneName(m[1] || m[2]);
   });
@@ -1191,10 +1192,12 @@ function helpSheet() {
     [],
     [H("What bar speed means")],
     [K("Bar speed"), K("Zone"), K("What it trains")],
-    [L("above 1.30 m/s"), W("Starting Strength / Speed"), W("0–30% of 1RM. Explosive speed work at very light loads.")],
-    [L("0.50 – 1.30 m/s"), W("Power"), W("30–80% of 1RM. Most of a training block's volume lives here.")],
-    [L("below 0.50 m/s"), W("Absolute Strength"), W("80–100% of 1RM. Heavy triples, doubles and near-maximal singles.")],
-    [M("Write the zone after the exercise, e.g. Back squat 5x3 power. The same limits apply to every lift.")],
+    [L("above 1.30 m/s"), W("Starting strength"), W("Bodyweight / very light. Jumps and throws from a dead stop.")],
+    [L("1.00 – 1.30 m/s"), W("Speed-strength"), W("About 20–40% of 1RM. Speed first, strength second.")],
+    [L("0.75 – 1.00 m/s"), W("Strength-speed"), W("About 40–60% of 1RM. Moderately heavy, as fast as possible.")],
+    [L("0.50 – 0.75 m/s"), W("Accelerative strength"), W("About 65–80% of 1RM. Heavy loads driven fast.")],
+    [L("below 0.50 m/s"), W("Absolute strength"), W("About 80–100% of 1RM. Heavy triples, doubles and singles.")],
+    [M("Write the zone after the exercise, e.g. Back squat 5x3 strength-speed, or medium for anywhere between 0.50 and 1.30 m/s. The same limits apply to every lift.")],
     [],
     [H("You don't have to use this layout")],
     [W("V-Lo also reads weeks across the top with exercises down the side, one sheet per week, a Word table, a CSV, or a plain text list. Anything it can't read is listed back to you rather than dropped silently.")]
@@ -1202,7 +1205,7 @@ function helpSheet() {
 
   return sheetXml(rows, [19, 52, 44], {
     gridLines: false,
-    heights: { 0: 24, 2: 8, 14: 8, 15: 22, 21: 8, 22: 22, 29: 8, 30: 22 }
+    heights: { 0: 24, 2: 8, 14: 8, 15: 22, 21: 8, 22: 22, 30: 8, 31: 22 }
   });
 }
 
@@ -1409,13 +1412,13 @@ function renderPlanItem(item) {
 
 // What a block of each type should mostly consist of, by velocity zone (keys).
 var BLOCK_EXPECTATION = {
-  hypertrophy: ["medium"],
-  strength: ["slow", "medium"],
-  peaking: ["slow"],
-  power: ["fast", "medium"],
-  speed: ["fast", "medium"],
-  "off season": ["medium"],
-  "in season": ["fast", "medium"]
+  hypertrophy: ["strength_speed", "accelerative_strength"],
+  strength: ["accelerative_strength", "absolute_strength"],
+  peaking: ["absolute_strength", "accelerative_strength"],
+  power: ["speed_strength", "strength_speed"],
+  speed: ["starting_strength", "speed_strength"],
+  "off season": ["strength_speed", "accelerative_strength"],
+  "in season": ["speed_strength", "strength_speed"]
 };
 
 var BLOCK_ORDER = ["block name", "block type", "working on", "end goal",
@@ -1458,7 +1461,11 @@ function renderBlock(plan, zoneCounts) {
   if (!expected || !zones.length) return;
 
   var total = zones.reduce(function (n, z) { return n + zoneCounts[z]; }, 0);
-  var onTarget = expected.reduce(function (n, z) { return n + (zoneCounts[z] || 0); }, 0);
+  // A broad "medium" target counts when the block expects one of its zones.
+  var onTarget = zones.reduce(function (n, z) {
+    var hit = expected.indexOf(z) >= 0 || (z === "medium" && expected.some(function (k) { return zoneGroup(k) === "medium"; }));
+    return n + (hit ? zoneCounts[z] : 0);
+  }, 0);
   var share = Math.round((onTarget / total) * 100);
   var dominant = zones.sort(function (a, b) { return zoneCounts[b] - zoneCounts[a]; })[0];
 

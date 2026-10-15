@@ -5,31 +5,65 @@
 /* ---------------- data model ---------------- */
 // Speed zones, fastest first, by a set's mean bar speed. The same limits for
 // every lift for now; give a lift its own list in EXERCISES if that changes.
-//   key   — what the code uses and what's saved (plans, recordings): fast /
-//           medium / slow, the same words as the data team's analysis TYPE.
-//   label — what the website shows.
+//
+// The website works in the five velocity zones from the literature (Bryan
+// Mann's VBT zones, as published by GymAware: gymaware.com/velocity_zones).
+// The code underneath has three groups, the same words as the data team's
+// analysis TYPE and what recordings save: fast / medium / slow. Each zone
+// belongs to exactly one group:
+//   fast   > 1.30 m/s        starting strength
+//   medium 0.50–1.30 m/s     speed-strength, strength-speed, accelerative strength
+//   slow   < 0.50 m/s        absolute strength
 var SPEED_ZONES = [
-  { key: "fast",   min: 1.30, label: "Starting Strength / Speed" },
-  { key: "medium", min: 0.50, label: "Power" },
-  { key: "slow",   min: 0,    label: "Absolute Strength" }
+  { key: "starting_strength",     min: 1.30, label: "Starting strength",     group: "fast" },
+  { key: "speed_strength",        min: 1.00, label: "Speed-strength",        group: "medium" },
+  { key: "strength_speed",        min: 0.75, label: "Strength-speed",        group: "medium" },
+  { key: "accelerative_strength", min: 0.50, label: "Accelerative strength", group: "medium" },
+  { key: "absolute_strength",     min: 0,    label: "Absolute strength",     group: "slow" }
+];
+var SPEED_GROUPS = [
+  { key: "fast",   min: 1.30 },
+  { key: "medium", min: 0.50 },
+  { key: "slow",   min: 0 }
 ];
 
-// Any zone name -> its key, or null. Accepts the keys, the labels, and the
-// names used before (plans saved earlier may hold them): speed-strength,
-// strength-speed, accelerative -> medium; maximal -> slow; explosive -> fast.
+function foldZoneName(name) {
+  return String(name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]+/g, " ").trim();
+}
+
+// Any zone name -> a zone key (starting_strength … absolute_strength), or
+// "medium" for the broad middle group (a coach may aim anywhere in
+// 0.50–1.30 m/s), or null. Accepts the keys, the labels, the group words
+// and the names used earlier (Power, Traditional, Maximal strength…).
 function zoneKey(name) {
   if (!name) return null;
-  var z = String(name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]+/g, " ").trim();
+  var z = foldZoneName(name);
   if (!z) return null;
-  if (z === "fast" || z === "speed" || /^(starting|explosiv)/.test(z)) return "fast";
-  if (z === "slow" || /^(absolute|max)/.test(z)) return "slow";
-  if (z === "medium" || /^(power|traditional|speed strength|strength speed|accelerative)/.test(z)) return "medium";
+  for (var i = 0; i < SPEED_ZONES.length; i++) {
+    if (z === foldZoneName(SPEED_ZONES[i].key) || z === foldZoneName(SPEED_ZONES[i].label)) return SPEED_ZONES[i].key;
+  }
+  if (/^speed strength/.test(z)) return "speed_strength";
+  if (/^strength speed/.test(z)) return "strength_speed";
+  if (/^accelerative/.test(z)) return "accelerative_strength";
+  if (z === "fast" || z === "speed" || /^(starting|explosiv)/.test(z)) return "starting_strength";
+  if (z === "slow" || /^(absolute|max)/.test(z)) return "absolute_strength";
+  if (z === "medium" || /^(power|traditional)/.test(z)) return "medium";
   return null;
+}
+
+// Any zone name -> its code group: fast / medium / slow (null if unknown).
+// This is what the analysis and the database use.
+function zoneGroup(name) {
+  var key = zoneKey(name);
+  if (key === "medium") return "medium";
+  var zone = SPEED_ZONES.filter(function (z) { return z.key === key; })[0];
+  return zone ? zone.group : null;
 }
 
 // What the website shows for a zone (any name accepted); unknown names as they are.
 function zoneLabel(name) {
   var key = zoneKey(name);
+  if (key === "medium") return "Speed-strength to accelerative strength";
   var zone = SPEED_ZONES.filter(function (z) { return z.key === key; })[0];
   return zone ? zone.label : (name || "");
 }
@@ -93,36 +127,35 @@ var EXERCISES = {
   }
 };
 
-// What each zone means, by zone key. pct = rough share of 1RM. parts = the classic
-// velocity zones a zone is made of (shown in the zone popup), from the
-// widely used VBT zone chart (e.g. GymAware's velocity zones).
+// What each zone means, by zone key. pct = typical share of 1RM (pctShort for
+// tables), from the
+// GymAware article text (Bryan Mann); the zone itself is always decided by
+// the measured bar speed, never by the %.
 var ZONE_INFO = {
-  fast: {
-    pct: "0–30% of 1RM",
-    desc: "Very light loads, or none, moved as fast as you possibly can: speed work, jumps and throws.",
-    benefit: "Trains the nervous system to get force going quickly from a standstill. Builds explosiveness and bar acceleration, but does little on its own to raise your 1RM.",
-    parts: [
-      { name: "Starting strength", pct: "0–30%", speed: "> 1.30 m/s" }
-    ]
+  starting_strength: {
+    pct: "bodyweight or very light loads", pctShort: "bodyweight",
+    desc: "Jumps, throws and other movements with very little load, starting from a standstill, as fast as possible.",
+    benefit: "Trains the ability to overcome inertia from a dead stop: getting the body or a light implement moving explosively. Builds speed, not maximal strength."
   },
-  medium: {
-    pct: "30–80% of 1RM",
-    desc: "Light-to-heavy loads lifted with intent to move fast. Most of a training block's volume lives here.",
-    benefit: "Builds strength, muscle and the ability to move heavy weight quickly: the bridge between speed and maximal strength.",
-    note: "Power combines the three classic zones between 0.50 and 1.30 m/s into one:",
-    parts: [
-      { name: "Speed–strength", pct: "30–50%", speed: "1.30–1.00 m/s" },
-      { name: "Strength–speed", pct: "50–70%", speed: "1.00–0.75 m/s" },
-      { name: "Accelerative strength", pct: "70–80%", speed: "0.75–0.50 m/s" }
-    ]
+  speed_strength: {
+    pct: "about 20–40% of 1RM", pctShort: "20–40%",
+    desc: "Light loads moved as fast as possible: speed comes first, strength second. Weighted jumps, throws, cleans, banded work.",
+    benefit: "Builds explosiveness under a light load, for example sprint starts, jumping and throwing."
   },
-  slow: {
-    pct: "80–100% of 1RM",
-    desc: "Heavy loads: triples, doubles and near-maximal singles. The bar slows down, but the intent to accelerate stays.",
-    benefit: "Builds maximal strength and grooves technique under competition-like loads. Essential for peaking, but taxing on the nervous system, so use it with care.",
-    parts: [
-      { name: "Absolute strength", pct: "80–100%", speed: "< 0.50 m/s" }
-    ]
+  strength_speed: {
+    pct: "about 40–60% of 1RM", pctShort: "40–60%",
+    desc: "Moderately heavy loads moved as fast as possible.",
+    benefit: "Builds the ability to produce a lot of force quickly: \"fast but still strong\", like a first step or a change of direction."
+  },
+  accelerative_strength: {
+    pct: "about 65–80% of 1RM", pctShort: "65–80%",
+    desc: "Heavy loads driven as fast as possible, e.g. squats, bench press and deadlifts in the working-set range.",
+    benefit: "Bridges raw strength and usable power: pushing hard against a heavy load and still accelerating it."
+  },
+  absolute_strength: {
+    pct: "about 80–100% of 1RM", pctShort: "80–100%",
+    desc: "Very heavy loads where the bar can't move faster than about 0.5 m/s: heavy triples, doubles and near-maximal singles.",
+    benefit: "Builds maximal strength, the ability to exert as much force as possible. Essential for powerlifting and peaking, but taxing, so use it with care."
   }
 };
 
@@ -136,7 +169,7 @@ function zoneRangeLabel(ex, idx) {
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Colour token for a speed's zone: --zone-1 (fastest zone) to --zone-3.
+// Colour token for a speed's zone: --zone-1 (fastest zone) to --zone-5.
 function zoneColor(ex, v) {
   for (var i = 0; i < ex.zones.length; i++) {
     if (v >= ex.zones[i].min) return "var(--zone-" + (i + 1) + ")";
@@ -151,6 +184,7 @@ function zoneColor(ex, v) {
 var ZONE_OPEN_BAND = 0.2;
 function zoneRange(ex, zone) {
   var key = zoneKey(zone), idx = -1;
+  if (key === "medium") return { lo: 0.50, hi: 1.30, mid: 0.90 }; // the whole middle group
   ex.zones.forEach(function (z, i) { if (z.key === key) idx = i; });
   if (idx === -1) return null;
   var lo = ex.zones[idx].min;
@@ -175,7 +209,8 @@ function isUneven(left, right) {
   return m !== null && m > LR_MISMATCH_LIMIT;
 }
 
-// The zone key (fast / medium / slow) a speed falls in. Show it with zoneLabel().
+// The zone key (e.g. strength_speed) a speed falls in. Show it with zoneLabel();
+// zoneGroup() gives fast / medium / slow.
 function zoneFor(ex, v) {
   for (var i = 0; i < ex.zones.length; i++) {
     if (v >= ex.zones[i].min) return ex.zones[i].key;

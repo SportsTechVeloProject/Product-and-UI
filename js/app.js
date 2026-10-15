@@ -167,14 +167,13 @@ function showZoneContent(zone) {
   document.getElementById("zoneModalTitle").textContent = ex.zones[idx].label;
   document.getElementById("zoneModalDesc").textContent = info.desc;
   document.getElementById("zoneModalBenefit").textContent = info.benefit;
-  var note = document.getElementById("zoneModalNote");
-  note.textContent = info.note || "";
-  note.hidden = !info.note;
+  // All five zones side by side, this one highlighted.
   var parts = document.getElementById("zoneModalParts");
   parts.innerHTML = "";
-  info.parts.forEach(function (p) {
+  ex.zones.forEach(function (z, i) {
     var tr = document.createElement("tr");
-    [p.name, p.pct, p.speed].forEach(function (text) {
+    if (i === idx) tr.className = "is-current";
+    [z.label, zoneRangeLabel(ex, i), ZONE_INFO[z.key].pctShort].forEach(function (text) {
       var td = document.createElement("td");
       td.textContent = text;
       tr.appendChild(td);

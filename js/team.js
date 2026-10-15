@@ -725,7 +725,7 @@ function todayStatus(w, logsToday) {
 }
 var TODAY_STATUS = { done: "\u2713 Done", started: "In progress", todo: "Not started" };
 
-// "Back squat 5×3 · Power"
+// "Back squat 5×3 · Strength-speed"
 function planItemText(item) {
   var scheme = item.sets && item.repsText ? item.sets + "\u00d7" + item.repsText : (item.repsText || (item.sets ? item.sets + " sets" : ""));
   var text = item.name + (scheme ? " " + scheme : "");
