@@ -38,7 +38,7 @@ var training = {
 
 var SET_FIELDS = "id, workout_id, item_index, exercise, set_no, weight_kg, reps, duration_s, distance_m, done_at, recording_id";
 var WORKOUT_FIELDS = "id, athlete_id, assignment_id, week_no, day_no, label, scheduled_date, started_at, completed_at";
-var POLL_MS = 2000;
+var POLL_MS = 1000;  // how often a set waiting for its analysis checks for the result
 var POLL_GIVE_UP_MS = 3 * 60 * 1000;
 
 function trainingReadOnly() {

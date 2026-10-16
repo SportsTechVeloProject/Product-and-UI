@@ -351,6 +351,24 @@ def seconds_since(iso):
 # Main
 # ============================================================
 
+def save_raw(token, session_id):
+    """--session <id> --save-raw: the recording's raw samples and its row, saved
+    next to the repo in .tmp-fixtures/ (git-ignored). Nothing is analyzed or changed."""
+    found = db.select(token, "sessions", "select=*&id=eq." + session_id)
+    if not found:
+        raise SystemExit("No session %s, or this account can't see it." % session_id)
+    samples = db.download_raw(token, found[0]["raw_data_path"])
+    folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".tmp-fixtures")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, session_id + ".json")
+    with open(path, "w") as f:
+        json.dump(samples, f)
+    with open(os.path.join(folder, session_id + ".row.json"), "w", encoding="utf-8") as f:
+        json.dump(found[0], f, indent=2, ensure_ascii=False, default=str)
+    print("Saved %d samples to %s" % (len(samples), os.path.normpath(path)))
+    print("(and its sessions row next to it, as %s.row.json)" % session_id)
+
+
 def log_in():
     email = os.environ.get("VLO_EMAIL") or input("V-Lo email: ")
     password = os.environ.get("VLO_PASSWORD") or getpass.getpass("Password: ")
@@ -368,6 +386,9 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="load and process only; nothing stored")
     parser.add_argument("--store-only", action="store_true",
                         help="upload the recording like the website does and stop; the processing on Azure analyzes it")
+    parser.add_argument("--save-raw", action="store_true",
+                        help="with --session: download the recording's raw file into .tmp-fixtures/ and stop "
+                             "(nothing analyzed or changed), e.g. to run the data team's own script on it")
     parser.add_argument("--plot", action="store_true", help="show the data team's plots")
     parser.add_argument("--zone", help="target zone for a local file: fast, medium or slow (Squats2 TYPE; default: none)")
     parser.add_argument("--watch", action="store_true", help="keep processing new recordings from the website")
@@ -396,6 +417,9 @@ def main():
                 print("\nStored only: Azure analyzes it now (Supabase webhook). Watch it with:\n"
                       "  select analyzed_at, analysis_error from sessions where id = '%s';" % session_id)
                 return
+        if args.save_raw:
+            save_raw(token, session_id)
+            return
         results = process_session(token, session_id, args.plot)
         save_reps(token, session_id, results, args.replace)
         mark_analyzed(token, session_id, quiet=True)
