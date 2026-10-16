@@ -917,6 +917,7 @@ var recordTicker = null;
 function startRecording(w, item, itemIndex, setNo) {
   if (Recorder.isRecording()) return;
   Recorder.start({ workoutId: w.id, simulated: sensorsSimulated() });
+  warmUpProcessing();
   training.recording = { workoutId: w.id, itemIndex: itemIndex, name: item.name, setNo: setNo };
   renderTrainingDay();
   clearInterval(recordTicker);

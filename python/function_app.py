@@ -7,9 +7,15 @@ a laptop. Setup and deployment: docs/azure-processing.md.
                   inserted into sessions. Puts the session id on a queue and
                   answers at once: the webhook gives up after a few seconds,
                   the analysis can take longer.
+  warm_up         HTTP, no key. The website calls it when real sensors connect
+                  (and on Record), so the analysis is awake by the time the set
+                  ends. Puts "warm-up" on the queue: on Flex Consumption the
+                  queue function runs on its own instances, so waking this HTTP
+                  function alone wouldn't help. Touches no data.
   process_session Queue. Analyzes one recording and saves its reps. Temporary
                   errors (network, Supabase busy) are raised, so the queue
-                  tries again (up to 5 times, see host.json).
+                  tries again (up to 5 times, see host.json). A "warm-up"
+                  message only loads the analysis code.
   sweep           Timer, daily at 03:00 UTC. Anything still waiting after 5
                   minutes: recordings older than the database's retry window
                   (a day; supabase/migrations/2026-10-14-resend-waiting-sessions.sql
@@ -25,6 +31,7 @@ import datetime
 import logging
 import os
 import re
+import time
 import urllib.parse
 
 # Matplotlib is imported by the analysis (for plots, unused here): no screen on
@@ -41,6 +48,10 @@ import azure.functions as func
 
 QUEUE = "sessions-to-process"
 SWEEP_AFTER_MINUTES = 5  # younger recordings are left to the webhook
+
+WARM_UP = "warm-up"
+WARM_UP_EVERY_S = 60  # per instance: a burst of calls queues one warm-up, not many
+last_warm_up = 0.0
 
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
@@ -80,10 +91,28 @@ def new_session(req: func.HttpRequest, queue: func.Out[str]) -> func.HttpRespons
     return func.HttpResponse("Queued " + session_id, status_code=202)
 
 
+@app.route(route="warm-up", methods=["POST", "GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.queue_output(arg_name="queue", queue_name=QUEUE, connection="AzureWebJobsStorage")
+def warm_up(req: func.HttpRequest, queue: func.Out[str]) -> func.HttpResponse:
+    global last_warm_up
+    now = time.time()
+    if now - last_warm_up < WARM_UP_EVERY_S:
+        return func.HttpResponse("Already warming up.", status_code=200)
+    last_warm_up = now
+    queue.set(WARM_UP)
+    logging.info("Warm-up queued")
+    return func.HttpResponse("Warming up.", status_code=202)
+
+
 @app.queue_trigger(arg_name="msg", queue_name=QUEUE, connection="AzureWebJobsStorage")
 def process_session(msg: func.QueueMessage) -> None:
-    main, db = analysis()
     session_id = msg.get_body().decode().strip()
+    if session_id == WARM_UP:
+        started = time.time()
+        analysis()  # loads numpy, scipy, pandas, imufusion and the data team's code
+        logging.info("Warm-up: analysis loaded in %.1f s", time.time() - started)
+        return
+    main, db = analysis()
     found = db.select(None, "sessions", main.WAITING_FIELDS + "&id=eq." + session_id + main.WAITING_FILTER)
     if not found:
         logging.info("Session %s: nothing to do (already analyzed, or not found).", session_id)
